@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ScalaCompilerConfiguration">
+    <profile name="sbt 1" modules="c910_core_3043,difftest" />
+    <profile name="sbt 2" modules="MicroRV64I">
+      <option name="reflectiveCalls" value="true" />
+      <option name="deprecationWarnings" value="true" />
+      <option name="featureWarnings" value="true" />
+      <parameters>
+        <parameter value="-Xsource:2.11" />
+        <parameter value="-Xcheckinit" />
+        <parameter value="-P:chiselplugin:useBundlePlugin" />
+      </parameters>
+      <plugins>
+        <plugin path="C:\Users\ZHUZHU\AppData\Local\Coursier\Cache\v1\https\repo1.maven.org\maven2\edu\berkeley\cs\chisel3-plugin_2.12.13\3.4.3\chisel3-plugin_2.12.13-3.4.3.jar" />
+        <plugin path="C:\Users\ZHUZHU\AppData\Local\Coursier\Cache\v1\https\repo1.maven.org\maven2\org\scalamacros\paradise_2.12.13\2.1.1\paradise_2.12.13-2.1.1.jar" />
+      </plugins>
+    </profile>
+  </component>
+</project>
