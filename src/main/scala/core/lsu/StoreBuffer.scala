@@ -51,6 +51,7 @@ class StoreBuffer extends Module with Config with HasCircularQueuePtrHelper {
   }
   val dequeueReady = valid(dequeueSelect) && cache_wait_cnt(dequeueSelect) === 0.U
   io.out.valid := dequeueReady && !addr_match.asUInt.orR
+  io.out.vaddr := data(dequeueSelect).vaddr
   io.out.paddr := data(dequeueSelect).paddr
   io.out.mask  := data(dequeueSelect).mask
   io.out.data  := data(dequeueSelect).data

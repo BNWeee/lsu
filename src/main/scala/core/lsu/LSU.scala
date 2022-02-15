@@ -46,6 +46,7 @@ class LSU extends Module with Config {
   //to Dcache
   io.load_cache.paddr.valid := io.loadTLB.paddr.valid || load_replay_valid
   io.load_cache.paddr.bits  := Mux(load_replay_valid, loadQ.io.load_replay.bits.paddr, io.loadTLB.paddr.bits)
+  io.load_cache.vaddr       := Mux(load_replay_valid, loadQ.io.load_replay.bits.vaddr, io.load_addr.bits.vaddr)
 
   //load pipeline reg
   val load_pipeline_valid  = RegNext(io.loadTLB.paddr.valid || load_replay_valid)

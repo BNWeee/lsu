@@ -38,6 +38,7 @@ class LoadData extends CoreBundle {
 class LoadReplay extends CoreBundle {
   val lsq_idx = new LSQPtr
   val paddr = UInt(PAddrBits.W)
+  val vaddr = UInt(VAddrBits.W)
   val optype = (FuncOpType.uwidth)
   val storeQ_fw_idx = new LSQPtr
   val reg_addr = UInt(NRPhyRegs.W)
@@ -69,6 +70,7 @@ class LSU_TLB extends CoreBundle {
 
 class Load_Cache extends CoreBundle {
   val paddr = ValidIO(UInt(PAddrBits.W))
+  val vaddr = Output(UInt(VAddrBits.W))
   //one cycle
   val res   = Flipped(ValidIO(UInt(XLEN.W)))
   val miss  = Input(Bool())
@@ -76,6 +78,7 @@ class Load_Cache extends CoreBundle {
 
 class Store_Cache extends CoreBundle {
   val valid = Output(Bool())
+  val vaddr = Output(UInt(VAddrBits.W))
   val paddr = Output(UInt(PAddrBits.W))
   val data  = Output(UInt(XLEN.W))
   val mask  = Output(UInt((XLEN/8).W))

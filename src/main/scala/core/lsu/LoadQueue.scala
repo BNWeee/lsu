@@ -90,6 +90,7 @@ class LoadQueue extends Module with Config with HasCircularQueuePtrHelper {
   io.load_replay.valid := LQ_data(replaySelect).valid && LQ_data(replaySelect).need_replay && LQ_wait_cnt(replaySelect) === 0.U
   io.load_replay.bits.lsq_idx         := replayPtr
   io.load_replay.bits.paddr           := LQ_data(replaySelect).paddr
+  io.load_replay.bits.vaddr           := LQ_data(replaySelect).vaddr
   io.load_replay.bits.optype          := LQ_data(replaySelect).optype
   io.load_replay.bits.storeQ_fw_idx   := LQ_data(replaySelect).storeQ_fw_idx
   io.load_replay.bits.reg_addr        := LQ_data(replaySelect).reg_addr

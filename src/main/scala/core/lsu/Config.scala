@@ -1,10 +1,12 @@
 package core.lsu
 
 import chisel3._
+import chisel3.util._
 
 abstract class CoreBundle extends Bundle with Config {}
 
 trait Config {
+  val PcStart = "h80000000"
   val XLEN = 64
   val VAddrBits = 39
   val PAddrBits = 40
@@ -12,6 +14,17 @@ trait Config {
   val StoreBufferSize = 16
   val RobSize = 128
   val NRPhyRegs = 64
+
+  val DCacheSize    = 64 //KB
+  val CacheLineBits = 512
+  val CacheLineSize = CacheLineBits/8
+  val DCacheWays    = 2
+  val DCacheSets    = DCacheSize*1024/CacheLineSize/DCacheWays //512
+  val OffsetBits    = log2Up(CacheLineSize) //6
+  val IndexBits     = log2Up(DCacheSets) //9
+  val DCacheTagBits = PAddrBits - 12
+  val DCRefillBits  = 64
+  val RefillCnt     = CacheLineBits/DCRefillBits
 }
 
 object Config extends Config{}
