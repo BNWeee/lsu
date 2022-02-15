@@ -46,7 +46,7 @@ class DCache extends Module with Config {
 
   //1.load
   val load_hit_check = WireInit(VecInit(Seq.fill(DCacheWays)(false.B)))
-  val load_idx = io.load.vaddr(IndexBits+OffsetBits,OffsetBits)
+  val load_idx = io.load.vaddr(IndexBits+OffsetBits-1,OffsetBits)
   for(i <- 0 until DCacheWays) {
     load_hit_check(i) := io.load.paddr.valid && valid(i)(load_idx) && tagArray(i)(load_idx) === io.load.paddr.bits(PAddrBits-1,12)
   }
@@ -67,7 +67,7 @@ class DCache extends Module with Config {
 
   //2.store
   val store_hit_check = WireInit(VecInit(Seq.fill(DCacheWays)(false.B)))
-  val store_idx = io.store.vaddr(IndexBits+OffsetBits,OffsetBits)
+  val store_idx = io.store.vaddr(IndexBits+OffsetBits-1,OffsetBits)
   for(i <- 0 until DCacheWays) {
     store_hit_check(i) := io.store.valid && valid(i)(store_idx) && tagArray(i)(store_idx) === io.store.paddr(PAddrBits-1,12)
   }
