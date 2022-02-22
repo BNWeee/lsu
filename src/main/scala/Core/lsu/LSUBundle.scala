@@ -1,4 +1,6 @@
-package core.lsu
+package Core.lsu
+
+import Core.{CoreBundle, FuncOpType}
 import chisel3._
 import chisel3.util._
 

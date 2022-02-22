@@ -1,4 +1,4 @@
-package core.lsu
+package Core
 
 import chisel3._
 import chisel3.util._
@@ -10,11 +10,18 @@ trait Config {
   val XLEN = 64
   val VAddrBits = 39
   val PAddrBits = 40
-  val LSQueueSize = 32
-  val StoreBufferSize = 16
+
+  //IFU
+  val uBTBSize = 16
+
+  //CtrlBlock
   val RobSize = 128
   val NRPhyRegs = 64
+  //LSU
+  val LSQueueSize = 32
+  val StoreBufferSize = 16
 
+  //DCache
   val DCacheSize    = 64 //KB
   val CacheLineBits = 512
   val CacheLineSize = CacheLineBits/8

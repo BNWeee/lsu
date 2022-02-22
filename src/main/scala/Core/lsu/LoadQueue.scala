@@ -1,4 +1,6 @@
-package core.lsu
+package Core.lsu
+import Core.utils.{HasCircularQueuePtrHelper, ParallelPriorityEncoder}
+import Core.{Config, CoreBundle, FuncOpType}
 import chisel3._
 import chisel3.util._
 

@@ -1,4 +1,6 @@
-package core.lsu
+package Core.lsu
+import Core.Config
+import Core.utils.RAMHelper
 import chisel3._
 import chisel3.util._
 
@@ -7,7 +9,7 @@ class DCacheRefill extends Module with Config {
     val req = Flipped(new RefillReq)
     val resp = Valid(new RefillResp)
   })
-  val s_idle :: s_req :: s_refill :: Nil = Enum(2)
+  val s_idle :: s_req :: s_refill :: Nil = Enum(3)
   val state = RegInit(s_idle)
 
   val rf_paddr = RegInit(0.U(PAddrBits.W))

@@ -1,4 +1,6 @@
-package core.lsu
+package Core.lsu
+import Core.utils.{CircularQueuePtr, HasCircularQueuePtrHelper, LookupTree, SignExt, ZeroExt}
+import Core.{Config, LSUOpType}
 import chisel3._
 import chisel3.util._
 
