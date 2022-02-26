@@ -13,6 +13,8 @@ trait Config {
 
   //IFU
   val uBTBSize = 16
+  val pre_array_data_size = 32
+  val ghr_size = 22
 
   //CtrlBlock
   val RobSize = 128

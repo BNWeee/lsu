@@ -53,8 +53,8 @@ class IPStage extends Module with Config {
 //                   BHT Information
 //==========================================================
 //BHT Result Get
-  val bht_pre_array  = Mux(io.bth_resp.pre_sel(1), io.bth_resp.pre_taken, io.bth_resp.pre_ntaken)
-  val bht_pre_result = bht_pre_array(io.bth_resp.pre_offset)
+  val bht_pre_array  = Mux(io.bht_resp.pre_sel(1), io.bht_resp.pre_taken, io.bht_resp.pre_ntaken)
+  val bht_pre_result = bht_pre_array(io.bht_resp.pre_offset)
 
   val br_taken = Wire(Vec(8,Bool()))
   val br_ntake = Wire(Vec(8,Bool()))
@@ -110,7 +110,7 @@ class IPStage extends Module with Config {
   io.out.bits.pc := io.pc
   io.out.bits.icache_resp := io.icache_resp.bits
   io.out.bits.decode_info := ipdecode.io.decode_info
-  io.out.bits.bht_resp := io.bth_resp
+  io.out.bits.bht_resp := io.bht_resp
   io.out.bits.btb_valid := btb_valid
   io.out.bits.btb_target := btb_target
   io.out.bits.btb_miss := btb_miss

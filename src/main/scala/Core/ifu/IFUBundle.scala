@@ -44,7 +44,7 @@ class IPStageIO extends  CoreBundle {
 
   val ubtb_resp   = Flipped(Valid(new uBTBResp))  //RegNext
   val icache_resp = Flipped(Valid(new ICacheResp))
-  val bth_resp    = Input(new BHT_IP_Resp)
+  val bht_resp    = Input(new BHT_IP_Resp)
   val btb_resp    = Vec(4,Flipped(Valid(UInt(20.W))))
 
   val out = Valid(new IP2IB)
