@@ -8,6 +8,8 @@ class BHTIO extends  CoreBundle {
   val cur_condbr_taken = Input(UInt(1.W))
   val cur_pre_rst      = Input(UInt(2.W))
   val cur_sel_rst      = Input(UInt(2.W))
+  val cur_pc           = Input(UInt(VAddrBits.W))
+  val cur_ghr          = Input(UInt(ghr_size.W))
   val bht_ipdp_pre_array_data_ntaken = Output(UInt(pre_array_data_size.W))
   val bht_ipdp_pre_array_data_taken = Output(UInt(pre_array_data_size.W))
   val bht_ipdp_sel_array_result = Output(UInt(2.W))
@@ -41,5 +43,16 @@ class BHT extends Module with Config {
   val sel_update_wen = (io.cur_condbr_taken & (io.cur_sel_rst =/= "b11".U)) | (!io.cur_condbr_taken & (io.cur_sel_rst =/= "b00".U))
   val pre_update_data = Mux(pre_update_wen===1.U,io.cur_pre_rst+1.U,io.cur_pre_rst-1.U)
   val sel_update_data = Mux(sel_update_wen===1.U,io.cur_sel_rst+1.U,io.cur_sel_rst-1.U)
-  
+
+  when(pre_update_wen === 1.U) {
+    pre_array(Cat(vghr(12,9),vghr(8,3)^vghr(20,15)))(io.cur_pc(6,3)^io.cur_ghr(3,0)) := pre_update_data
+  }.otherwise {
+    pre_array := pre_array
+  }
+  when(sel_update_wen === 1.U) {
+    sel_array(sel_array_index)(sel_array_data_index) := sel_update_data
+  }.otherwise {
+    sel_array := sel_array
+  }
+
 }
