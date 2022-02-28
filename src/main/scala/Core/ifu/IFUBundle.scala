@@ -60,7 +60,20 @@ class IPStageIO extends  CoreBundle {
 
   val out = Valid(new IP2IB)
 }
+class IBStageIO extends CoreBundle {
+  val ip2ib       = Flipped(Valid(new IP2IB))
 
+  val ind_jmp_valid  = Output(Bool())
+  val ind_btb_target = Input(UInt(20.W))
+}
+class chgflw extends CoreBundle {
+  val vld = Input(Bool())
+  val pc  = Input(VAddrBits.W)
+  val pred = Input(UInt(2.W))
+  val vlmu = Input(UInt(2.W))
+  val vsew = Input(UInt(3.W))
+  val vl   = Input(UInt(8.W))
+}
 class BPUUpdate extends CoreBundle {
 
 }

@@ -14,7 +14,7 @@ class indBTBIO extends CoreBundle {
   val ind_btb_path = Input(UInt(8.W))//pc(11,4)
   val ib_jmp_valid = Input(Bool())
 
-  val ind_btb_target = Input(UInt(20.W))
+  val ind_btb_target = Output(UInt(20.W))
 }
 
 class indBTB extends Module with Config {
@@ -40,6 +40,8 @@ class indBTB extends Module with Config {
     path_reg_pre(i) := Mux(path_reg_update, rtu_path_reg_pre(i), Mux(io.ib_jmp_valid, path_reg(i-1), path_reg(i)))
   }
   path_reg_pre(0) := Mux(path_reg_update, rtu_path_reg_pre(0), Mux(io.ib_jmp_valid, io.ind_btb_path, path_reg(0)))
+
+  path_reg := path_reg_pre
 
   val wr_idx = WireInit(0.U(8.W))
   val rd_idx = WireInit(0.U(8.W))

@@ -2,7 +2,8 @@ package Core.ifu
 import Core.{Config, CoreBundle}
 import chisel3._
 import chisel3.util._
-class rasIO extends CoreBundle {
+class RASIO extends CoreBundle {
+
   val cp0_ifu_ras_en          = Input(Bool())
   val ibdp_ras_push_pc        = Input(UInt(VAddrBits.W))
   val rtu_ifu_flush           = Input(Bool())
@@ -11,13 +12,13 @@ class rasIO extends CoreBundle {
   val rtu_ifu_preturn         = Input(Bool())
   val ibctrl_ras_pcall_vld    = Input(Bool())
   val ibctrl_ras_preturn_vld  = Input(Bool())
-  val ibctrl_ras_inst_pcall   = Input(Bool())
+
   val ras_ipdp_pc             = Output(UInt(VAddrBits.W))
   val ras_l0_btb_pc           = Output(UInt(VAddrBits.W))
   val ras_l0_btb_push_pc      = Output(UInt(VAddrBits.W))
 }
-class ras extends Module with Config {
-  val io = IO(new rasIO)
+class RAS extends Module with Config {
+  val io = IO(new RASIO)
   val ras = Mem(ifu_ras, UInt(VAddrBits.W))
   //ras fifo
   val ras_push = Wire(Bool())

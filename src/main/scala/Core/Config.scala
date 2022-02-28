@@ -17,6 +17,7 @@ trait Config {
   val ghr_size = 22
   val rtu_ras = 6
   val ifu_ras = 12
+  val IBufSize = 32
 
   //CtrlBlock
   val RobSize = 128

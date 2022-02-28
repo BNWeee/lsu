@@ -34,8 +34,8 @@ class IPStage extends Module with Config {
   for(i <- 0 until 8) {
     bry0(i)  := io.icache_resp.bits.predecode(i)(0)
     bry1(i)  := io.icache_resp.bits.predecode(i)(1)
-    br(i)    := io.icache_resp.bits.predecode(i)(2)
-    ab_br(i) := io.icache_resp.bits.predecode(i)(3)
+    br(i)    := io.icache_resp.bits.predecode(i)(2) //branch and jal (get offset)
+    ab_br(i) := io.icache_resp.bits.predecode(i)(3) //jal
   }
 
   //bry1_hit是数学问题，想了很久，终于明白了。。。

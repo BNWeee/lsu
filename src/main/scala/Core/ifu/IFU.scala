@@ -42,6 +42,12 @@ class IFU extends Module with Config {
   ipstage.io.icache_resp := io.cache_resp
 
   //IB stage
+  val ip_out = RegNext(ipstage.io.out)
+
+  val ind_btb = Module(new indBTB)
+  ind_btb.io.bht_ghr := bht.io.bht_ghr
+  ind_btb.io.rtu_ghr := bht.io.rtu_ghr
+  ind_btb.io.ind_btb_path := ip_out.bits.pc
 
 
 }
