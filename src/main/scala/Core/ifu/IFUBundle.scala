@@ -16,9 +16,20 @@ class BHT_IP_Resp extends CoreBundle {
   val pre_sel    = UInt(2.W)
 }
 
+class ICacheReq extends CoreBundle {
+  val vaddr = UInt(VAddrBits.W)
+  val paddr = UInt(PAddrBits.W)
+}
+
 class ICacheResp extends CoreBundle {
   val inst_data = Vec(8,UInt(16.W))
   val predecode = Vec(8,UInt(4.W))
+}
+
+class IFU_TLB extends CoreBundle {
+  val vaddr = ValidIO(UInt(VAddrBits.W))
+  val paddr = Flipped(ValidIO(UInt(PAddrBits.W)))
+  val tlb_miss = Input(Bool())
 }
 
 class IP2IB extends CoreBundle {
@@ -48,4 +59,19 @@ class IPStageIO extends  CoreBundle {
   val btb_resp    = Vec(4,Flipped(Valid(UInt(20.W))))
 
   val out = Valid(new IP2IB)
+}
+
+class BPUUpdate extends CoreBundle {
+
+}
+
+class IFUIO extends CoreBundle {
+  //flush
+  val bru_redirect = Flipped(Valid(UInt(VAddrBits.W)))
+  //inst fetch
+  val tlb        = new IFU_TLB
+  val cache_req  = Valid(new ICacheReq)
+  val cache_resp = Flipped(Valid(new ICacheResp))
+  //bht, btb update
+  val bpu_update = new BPUUpdate
 }
