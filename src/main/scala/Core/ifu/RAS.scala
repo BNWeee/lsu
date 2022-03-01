@@ -4,12 +4,13 @@ import chisel3._
 import chisel3.util._
 class RASIO extends CoreBundle {
 
-  val cp0_ifu_ras_en          = Input(Bool())
-  val ibdp_ras_push_pc        = Input(UInt(VAddrBits.W))
+  //val cp0_ifu_ras_en          = Input(Bool())
+
   val rtu_ifu_flush           = Input(Bool())
   val rtu_ifu_mispred         = Input(Bool())
   val rtu_ifu_pcall           = Input(Bool())
   val rtu_ifu_preturn         = Input(Bool())
+  val ibdp_ras_push_pc        = Input(UInt(VAddrBits.W))
   val ibctrl_ras_pcall_vld    = Input(Bool())
   val ibctrl_ras_preturn_vld  = Input(Bool())
 

@@ -53,5 +53,6 @@ class IPDecode extends Module with Config {
     io.decode_info.ret(i)     := ifu_decode(i).io.is_return
     io.decode_info.offset(i)  := ifu_decode(i).io.offset
   }
+  // pc mask   &&  changeflow mask
 
 }

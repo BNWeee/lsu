@@ -11,9 +11,11 @@ class IPStage extends Module with Config {
 
   val pc_mask = UIntToMask.rightmask(io.pc(3,1), 9)(8,1)
 
+
   val inst_32 = Wire(Vec(8,Bool()))
   for(i <- 0 until 8){
     inst_32(i) := io.icache_resp.bits.inst_data(i) === "0b11".U
+
   }
 
   //last half inst
@@ -105,6 +107,41 @@ class IPStage extends Module with Config {
   ipdecode.io.half_inst := h0_data +: io.icache_resp.bits.inst_data
   ipdecode.io.icache_br := h0_br +: br
 
+  // pc mask h0 -->>9 bits mask
+  val pc_mask9 = Cat(pc_mask,h0_valid)
+  val chgflw = ipdecode.io.decode_info.chgflw.asUInt()   //contain all the chgflw inst except con_br
+  val con_br    = ipdecode.io.decode_info.con_br.asUInt()
+  val bry9     = Cat(bry.asUInt(),h0_valid)  // inst start info
+  val change_flow = Mux(bht_pre_result(1), chgflw | con_br, chgflw) & bry9 & pc_mask9 & Cat(!inst_32(7),"b1111_1111".U) //take bht predict con_br result
+  val chgflw_afterhead = PriorityMux(Seq(
+    change_flow(0) -> "b0000_0001_1".U,
+    change_flow(1) -> Mux(inst_32(0),"b0000_0011_1".U,"b0000_0001_1".U),
+    change_flow(2) -> Mux(inst_32(1),"b0000_0111_1".U,"b0000_0011_1".U),
+    change_flow(3) -> Mux(inst_32(2),"b0000_1111_1".U,"b0000_0111_1".U),
+    change_flow(4) -> Mux(inst_32(3),"b0001_1111_1".U,"b0000_1111_1".U),
+    change_flow(5) -> Mux(inst_32(4),"b0011_1111_1".U,"b0001_1111_1".U),
+    change_flow(6) -> Mux(inst_32(5),"b0111_1111_1".U,"b0011_1111_1".U),
+    change_flow(7) -> Mux(inst_32(6),"b1111_1111_1".U,"b0111_1111_1".U),
+    change_flow(8) -> "b1111_1111_1".U,
+    true.B               -> "b1111_1111_1".U
+  ))
+  val chgflw_mask = chgflw_afterhead & pc_mask9
+  val p_call = (chgflw_mask & ipdecode.io.decode_info.call.asUInt() &bry9 & Cat(!inst_32(7),"b1111_1111".U)).orR()
+  val p_return = (chgflw_mask & ipdecode.io.decode_info.ret.asUInt() &bry9 & Cat(!inst_32(7),"b1111_1111".U)).orR()
+  val pcall_pc_mask = p_call & pc_mask9
+  // take 9 pc where is pc?
+  val push_pc = PriorityMux(Seq(
+    pcall_pc_mask(0) -> ,
+    pcall_pc_mask(1) -> ,
+    pcall_pc_mask(2) -> ,
+    pcall_pc_mask(3) -> ,
+    pcall_pc_mask(4) -> ,
+    pcall_pc_mask(5) -> ,
+    pcall_pc_mask(6) -> ,
+    pcall_pc_mask(7) -> ,
+    pcall_pc_mask(8) -> "b1111_1111_1".U,
+    true.B               -> "b1111_1111_1".U
+  ))
   //to IBStage
   io.out.valid := ip_data_valid
   io.out.bits.pc := io.pc
@@ -119,5 +156,8 @@ class IPStage extends Module with Config {
   io.out.bits.ubtb_resp := io.ubtb_resp.bits
   io.out.bits.ubtb_miss := ubtb_miss
   io.out.bits.ubtb_mispred := ubtb_mispred
+  io.out.bits.pcall := p_call
+  io.out.bits.pret := p_return
+  io.out.bits.push_pc := push_pc
 
 }

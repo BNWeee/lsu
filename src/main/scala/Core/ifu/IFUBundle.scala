@@ -22,7 +22,7 @@ class ICacheReq extends CoreBundle {
 }
 
 class ICacheResp extends CoreBundle {
-  val inst_data = Vec(8,UInt(16.W))
+  val inst_data = Vec(8,UInt(16.W))   //h0 +8
   val predecode = Vec(8,UInt(4.W))
 }
 
@@ -46,6 +46,9 @@ class IP2IB extends CoreBundle {
   val ubtb_resp = new uBTBResp
   val ubtb_miss = Bool()
   val ubtb_mispred = Bool()
+  val pcall = Bool()
+  val pret  = Bool()
+  val push_pc = UInt(VAddrBits.W)
 }
 
 class IPStageIO extends  CoreBundle {
@@ -61,10 +64,14 @@ class IPStageIO extends  CoreBundle {
   val out = Valid(new IP2IB)
 }
 class IBStageIO extends CoreBundle {
+  val pc          = Input(UInt(VAddrBits.W))
   val ip2ib       = Flipped(Valid(new IP2IB))
-
+  val ib_redirect = Valid(UInt(VAddrBits.W))
   val ind_jmp_valid  = Output(Bool())
   val ind_btb_target = Input(UInt(20.W))
+  val btbmiss        = Output(Bool())
+  val ubtb_update    = Output(new uBTBUpdateData)
+  val ras_push_pc    = Output(UInt(VAddrBits.W))
 }
 class chgflw extends CoreBundle {
   val vld = Input(Bool())
