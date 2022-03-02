@@ -56,9 +56,15 @@ class uBTB extends Module with Config with HasCircularQueuePtrHelper {
   io.ubtb_resp.bits.is_ret    := entry_hit_ras
 
   //ubtb update
+  val idx_OH2UInt = WireInit(0.U(5.W))
+  for(i <- 0 until 16){
+    when(io.update_idx.bits(i)){
+      idx_OH2UInt := i.U
+    }
+  }
   val update_index = WireInit(0.U(log2Up(uBTBSize).W))
   when(io.update_data.valid && io.update_idx.valid){
-    update_index := io.update_idx.bits
+    update_index := idx_OH2UInt
   }.elsewhen(io.update_data.valid && !io.update_idx.valid){
     update_index := enqPtr.value
     enqPtr := enqPtr + 1.U

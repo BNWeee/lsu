@@ -38,6 +38,11 @@ class IP2IB extends CoreBundle {
   val decode_info = new IPDecodeOutput
 
   val bht_resp  = new BHT_IP_Resp
+  val bht_res = UInt(2.W)
+  val is_ab_br = Bool()
+  val br_position = UInt(4.W)
+  val br_offset = UInt(21.W)
+  val br_valid = Bool()
   val btb_valid = Bool()
   val btb_target = UInt(20.W)
   val btb_miss = Bool()
@@ -48,7 +53,13 @@ class IP2IB extends CoreBundle {
   val ubtb_mispred = Bool()
   val pcall = Bool()
   val pret  = Bool()
+  val ind_vld = Bool()
   val push_pc = UInt(VAddrBits.W)
+  val h0_vld = Bool()
+  val h0_data = UInt(8.W)
+  val h0_predecode = UInt(4.W)
+  val inst_32_9 = UInt(9.W)
+  val chgflw_vld_mask = UInt(9.W)
 }
 
 class IPStageIO extends  CoreBundle {
@@ -64,6 +75,7 @@ class IPStageIO extends  CoreBundle {
   val br_res = Flipped(new ib_addrgen)
   val out = Valid(new IP2IB)
 }
+
 class IBStageIO extends CoreBundle {
   val pc          = Input(UInt(VAddrBits.W))
   val ip2ib       = Flipped(Valid(new IP2IB))
@@ -73,8 +85,13 @@ class IBStageIO extends CoreBundle {
   val ind_jmp_valid  = Output(Bool())
   val ind_btb_target = Input(UInt(20.W))
   val btbmiss        = Output(Bool())
-  val ubtb_update    = Output(new uBTBUpdateData)
+
   val ras_push_pc    = Output(UInt(VAddrBits.W))
+  val ras_target_pc  = Input(UInt(VAddrBits.W))  //ras stack top
+
+  val btb_update       = Valid(new BTBUpdate)
+  val ubtb_update_data = Valid(new uBTBUpdateData)
+  val ubtb_update_idx  = Valid(UInt(16.W))
 }
 class chgflw extends CoreBundle {
   val vld = Input(Bool())
@@ -95,6 +112,8 @@ class IFUIO extends CoreBundle {
   val tlb        = new IFU_TLB
   val cache_req  = Valid(new ICacheReq)
   val cache_resp = Flipped(Valid(new ICacheResp))
+  //inst out
+  val ifu_inst_out = ip_out.bits.inst_32_9(i+1)
   //bht, btb update
   val bpu_update = new BPUUpdate
 }

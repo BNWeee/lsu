@@ -15,6 +15,7 @@ class RASIO extends CoreBundle {
   val ibctrl_ras_preturn_vld  = Input(Bool())
 
   val ras_ipdp_pc             = Output(UInt(VAddrBits.W))
+  val ras_target_pc           = Output(UInt(VAddrBits.W))
   val ras_l0_btb_pc           = Output(UInt(VAddrBits.W))
   val ras_l0_btb_push_pc      = Output(UInt(VAddrBits.W))
 }
@@ -94,6 +95,7 @@ class RAS extends Module with Config {
     ras.write(rtu_ptr,ras_push_pc)
   }
   io.ras_ipdp_pc        := Mux(io.ibctrl_ras_inst_pcall,io.ibdp_ras_push_pc,ras_pc_out)
+  io.ras_target_pc      := Mux(io.ibctrl_ras_inst_pcall,io.ibdp_ras_push_pc,ras_pc_out)
   io.ras_l0_btb_push_pc := io.ibdp_ras_push_pc
   io.ras_ipdp_pc        := ras_pc_out
 

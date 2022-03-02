@@ -27,6 +27,7 @@ class IPStage extends Module with Config {
   h0_data      := io.icache_resp.bits.inst_data(7)
   h0_predecode := io.icache_resp.bits.predecode(7)
 
+
   //predecode
   val bry0  = Wire(Vec(8,Bool()))
   val bry1  = Wire(Vec(8,Bool()))
@@ -114,6 +115,7 @@ class IPStage extends Module with Config {
   val con_br  = ipdecode.io.decode_info.con_br.asUInt() & bry9 & Cat(!inst_32(7),"b1111_1111".U)
   val pcall   = ipdecode.io.decode_info.call.asUInt() & bry9 & Cat(!inst_32(7),"b1111_1111".U)
   val preturn = ipdecode.io.decode_info.ret.asUInt() & bry9 & Cat(!inst_32(7),"b1111_1111".U)
+  val jalr    = ipdecode.io.decode_info.jalr.asUInt() & bry9 & Cat(!inst_32(7),"b1111_1111".U)
 
   val chgflw_after_head = Mux(bht_pre_result(1), chgflw | con_br, chgflw) & pc_mask9 //take bht predict con_br result
   val chgflw_mask_pre = PriorityMux(Seq(
@@ -131,6 +133,7 @@ class IPStage extends Module with Config {
   val chgflw_vld_mask = chgflw_mask_pre & pc_mask9
   val pcall_vld   = chgflw_vld_mask & pcall
   val preturn_vld = chgflw_vld_mask & preturn
+  val ind_vld     = chgflw_vld_mask & jalr & !preturn
   val push_pc_vec = Wire(Vec(8+1,UInt(VAddrBits.W)))
   push_pc_vec(0) := Cat(io.pc(VAddrBits-1,4), 0.U(4.W)) + 2.U  //inst 32
   push_pc_vec(8) := Cat(io.pc(VAddrBits-1,4), 0.U(4.W)) + 16.U // inst 16
@@ -150,6 +153,23 @@ class IPStage extends Module with Config {
     pcall_vld(8) -> push_pc_vec(8)
   ))
 
+  val br_position = PriorityMux(Seq(
+    br_mask(0) -> 0.U,
+    br_mask(1) -> 1.U,
+    br_mask(2) -> 2.U,
+    br_mask(3) -> 3.U,
+    br_mask(4) -> 4.U,
+    br_mask(5) -> 5.U,
+    br_mask(6) -> 6.U,
+    br_mask(7) -> 7.U
+  ))
+
+  val br_offset = WireInit(0.U(21.W))
+  for(i <- 0 until 8){
+    when(br_position === i.U) {
+      br_offset := ipdecode.io.decode_info.offset(i)
+    }
+  }
   // offset
   val branch_mask = Cat(br_mask.asUInt(),br_mask(0).asUInt()) & chgflw_vld_mask
   val branch_base = PriorityMux(Seq(
@@ -164,11 +184,7 @@ class IPStage extends Module with Config {
     branch_mask(8) -> push_pc_vec(8)
   ))
 
-  for(i <- 0 until 4){
-    when(br_mask(2*i+1) || br_mask(2*i)) {
-      io.br_res.ib_br_offset := Mux(br_mask(2*i),ipdecode.io.decode_info.offset(2*i+1),ipdecode.io.decode_info.offset(2*i+2))
-    }
-  }
+  io.br_res.ib_br_offset := br_offset
   // base
   io.br_res.ib_br_base := branch_base
   //result
@@ -192,7 +208,12 @@ class IPStage extends Module with Config {
   io.out.bits.pc := io.pc
   io.out.bits.icache_resp := io.icache_resp.bits
   io.out.bits.decode_info := ipdecode.io.decode_info
+  io.out.bits.is_ab_br := ab_br(br_position)
   io.out.bits.bht_resp := io.bht_resp
+  io.out.bits.bht_res  := bht_pre_result
+  io.out.bits.br_position := br_position
+  io.out.bits.br_offset := br_offset
+  io.out.bits.br_valid  := br_mask.asUInt().orR()
   io.out.bits.btb_valid := btb_valid
   io.out.bits.btb_target := btb_target
   io.out.bits.btb_miss := btb_miss
@@ -203,6 +224,11 @@ class IPStage extends Module with Config {
   io.out.bits.ubtb_mispred := ubtb_mispred
   io.out.bits.pcall := pcall_vld.orR
   io.out.bits.pret := preturn_vld.orR
+  io.out.bits.ind_vld := ind_vld.orR
   io.out.bits.push_pc := push_pc
-
+  io.out.bits.h0_vld       := h0_valid
+  io.out.bits.h0_data      := h0_data
+  io.out.bits.h0_predecode := h0_predecode
+  io.out.bits.inst_32_9    := Cat(inst_32.asUInt(),1.U(1.W)) & bry9
+  io.out.bits.chgflw_vld_mask := chgflw_vld_mask
 }
