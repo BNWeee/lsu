@@ -61,11 +61,14 @@ class IPStageIO extends  CoreBundle {
   val bht_resp    = Input(new BHT_IP_Resp)
   val btb_resp    = Vec(4,Flipped(Valid(UInt(20.W))))
 
+  val br_res = Flipped(new ib_addrgen)
   val out = Valid(new IP2IB)
 }
 class IBStageIO extends CoreBundle {
   val pc          = Input(UInt(VAddrBits.W))
   val ip2ib       = Flipped(Valid(new IP2IB))
+  val ip_ib_addr  = new ib_addrgen
+  val ib2addrgen  = Flipped(new ib_addrgen)
   val ib_redirect = Valid(UInt(VAddrBits.W))
   val ind_jmp_valid  = Output(Bool())
   val ind_btb_target = Input(UInt(20.W))

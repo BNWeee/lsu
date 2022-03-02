@@ -51,10 +51,10 @@ class IPStage extends Module with Config {
     h0_valid := false.B
   }
 
-//==========================================================
-//                   BHT Information
-//==========================================================
-//BHT Result Get
+  //==========================================================
+  //                   BHT Information
+  //==========================================================
+  //BHT Result Get
   val bht_pre_array  = Mux(io.bht_resp.pre_sel(1), io.bht_resp.pre_taken, io.bht_resp.pre_ntaken)
   val bht_pre_result = bht_pre_array(io.bht_resp.pre_offset)
 
@@ -108,40 +108,85 @@ class IPStage extends Module with Config {
   ipdecode.io.icache_br := h0_br +: br
 
   // pc mask h0 -->>9 bits mask
-  val pc_mask9 = Cat(pc_mask,h0_valid)
-  val chgflw = ipdecode.io.decode_info.chgflw.asUInt()   //contain all the chgflw inst except con_br
-  val con_br    = ipdecode.io.decode_info.con_br.asUInt()
   val bry9     = Cat(bry.asUInt(),h0_valid)  // inst start info
-  val change_flow = Mux(bht_pre_result(1), chgflw | con_br, chgflw) & bry9 & pc_mask9 & Cat(!inst_32(7),"b1111_1111".U) //take bht predict con_br result
-  val chgflw_afterhead = PriorityMux(Seq(
-    change_flow(0) -> "b0000_0001_1".U,
-    change_flow(1) -> Mux(inst_32(0),"b0000_0011_1".U,"b0000_0001_1".U),
-    change_flow(2) -> Mux(inst_32(1),"b0000_0111_1".U,"b0000_0011_1".U),
-    change_flow(3) -> Mux(inst_32(2),"b0000_1111_1".U,"b0000_0111_1".U),
-    change_flow(4) -> Mux(inst_32(3),"b0001_1111_1".U,"b0000_1111_1".U),
-    change_flow(5) -> Mux(inst_32(4),"b0011_1111_1".U,"b0001_1111_1".U),
-    change_flow(6) -> Mux(inst_32(5),"b0111_1111_1".U,"b0011_1111_1".U),
-    change_flow(7) -> Mux(inst_32(6),"b1111_1111_1".U,"b0111_1111_1".U),
-    change_flow(8) -> "b1111_1111_1".U,
+  val pc_mask9 = Cat(pc_mask,h0_valid)
+  val chgflw  = ipdecode.io.decode_info.chgflw.asUInt() & bry9 & Cat(!inst_32(7),"b1111_1111".U)  //contain all the chgflw inst except con_br
+  val con_br  = ipdecode.io.decode_info.con_br.asUInt() & bry9 & Cat(!inst_32(7),"b1111_1111".U)
+  val pcall   = ipdecode.io.decode_info.call.asUInt() & bry9 & Cat(!inst_32(7),"b1111_1111".U)
+  val preturn = ipdecode.io.decode_info.ret.asUInt() & bry9 & Cat(!inst_32(7),"b1111_1111".U)
+
+  val chgflw_after_head = Mux(bht_pre_result(1), chgflw | con_br, chgflw) & pc_mask9 //take bht predict con_br result
+  val chgflw_mask_pre = PriorityMux(Seq(
+    chgflw_after_head(0) -> "b0000_0001_1".U,
+    chgflw_after_head(1) -> Mux(inst_32(0),"b0000_0011_1".U,"b0000_0001_1".U),
+    chgflw_after_head(2) -> Mux(inst_32(1),"b0000_0111_1".U,"b0000_0011_1".U),
+    chgflw_after_head(3) -> Mux(inst_32(2),"b0000_1111_1".U,"b0000_0111_1".U),
+    chgflw_after_head(4) -> Mux(inst_32(3),"b0001_1111_1".U,"b0000_1111_1".U),
+    chgflw_after_head(5) -> Mux(inst_32(4),"b0011_1111_1".U,"b0001_1111_1".U),
+    chgflw_after_head(6) -> Mux(inst_32(5),"b0111_1111_1".U,"b0011_1111_1".U),
+    chgflw_after_head(7) -> Mux(inst_32(6),"b1111_1111_1".U,"b0111_1111_1".U),
+    chgflw_after_head(8) -> "b1111_1111_1".U,
     true.B               -> "b1111_1111_1".U
   ))
-  val chgflw_mask = chgflw_afterhead & pc_mask9
-  val p_call = (chgflw_mask & ipdecode.io.decode_info.call.asUInt() &bry9 & Cat(!inst_32(7),"b1111_1111".U)).orR()
-  val p_return = (chgflw_mask & ipdecode.io.decode_info.ret.asUInt() &bry9 & Cat(!inst_32(7),"b1111_1111".U)).orR()
-  val pcall_pc_mask = p_call & pc_mask9
+  val chgflw_vld_mask = chgflw_mask_pre & pc_mask9
+  val pcall_vld   = chgflw_vld_mask & pcall
+  val preturn_vld = chgflw_vld_mask & preturn
+  val push_pc_vec = Wire(Vec(8+1,UInt(VAddrBits.W)))
+  push_pc_vec(0) := Cat(io.pc(VAddrBits-1,4), 0.U(4.W)) + 2.U  //inst 32
+  push_pc_vec(8) := Cat(io.pc(VAddrBits-1,4), 0.U(4.W)) + 16.U // inst 16
+  for(i <- 1 until 8){
+    push_pc_vec(i) := Cat(io.pc(VAddrBits-1,4), 0.U(4.W)) + Mux(inst_32(i-1), 2.U, 0.U) + (i.U << 1.U)
+  }
   // take 9 pc where is pc?
   val push_pc = PriorityMux(Seq(
-    pcall_pc_mask(0) -> ,
-    pcall_pc_mask(1) -> ,
-    pcall_pc_mask(2) -> ,
-    pcall_pc_mask(3) -> ,
-    pcall_pc_mask(4) -> ,
-    pcall_pc_mask(5) -> ,
-    pcall_pc_mask(6) -> ,
-    pcall_pc_mask(7) -> ,
-    pcall_pc_mask(8) -> "b1111_1111_1".U,
-    true.B               -> "b1111_1111_1".U
+    pcall_vld(0) -> push_pc_vec(0),
+    pcall_vld(1) -> push_pc_vec(1),
+    pcall_vld(2) -> push_pc_vec(2),
+    pcall_vld(3) -> push_pc_vec(3),
+    pcall_vld(4) -> push_pc_vec(4),
+    pcall_vld(5) -> push_pc_vec(5),
+    pcall_vld(6) -> push_pc_vec(6),
+    pcall_vld(7) -> push_pc_vec(7),
+    pcall_vld(8) -> push_pc_vec(8)
   ))
+
+  // offset
+  val branch_mask = Cat(br_mask.asUInt(),br_mask(0).asUInt()) & chgflw_vld_mask
+  val branch_base = PriorityMux(Seq(
+    branch_mask(0) -> push_pc_vec(0),
+    branch_mask(1) -> push_pc_vec(1),
+    branch_mask(2) -> push_pc_vec(2),
+    branch_mask(3) -> push_pc_vec(3),
+    branch_mask(4) -> push_pc_vec(4),
+    branch_mask(5) -> push_pc_vec(5),
+    branch_mask(6) -> push_pc_vec(6),
+    branch_mask(7) -> push_pc_vec(7),
+    branch_mask(8) -> push_pc_vec(8)
+  ))
+
+  for(i <- 0 until 4){
+    when(br_mask(2*i+1) || br_mask(2*i)) {
+      io.br_res.ib_br_offset := Mux(br_mask(2*i),ipdecode.io.decode_info.offset(2*i+1),ipdecode.io.decode_info.offset(2*i+2))
+    }
+  }
+  // base
+  io.br_res.ib_br_base := branch_base
+  //result
+  io.br_res.ib_br_result := Cat(io.pc(38,20),btb_target)
+  //index pc
+  val index_pc = PriorityMux(Seq(
+    br_mask(0) -> Cat(io.pc(38,3),"b000".U),
+    br_mask(1) -> Cat(io.pc(38,3),"b001".U),
+    br_mask(2) -> Cat(io.pc(38,3),"b010".U),
+    br_mask(3) -> Cat(io.pc(38,3),"b011".U),
+    br_mask(4) -> Cat(io.pc(38,3),"b100".U),
+    br_mask(5) -> Cat(io.pc(38,3),"b101".U),
+    br_mask(6) -> Cat(io.pc(38,3),"b110".U),
+    br_mask(7) -> Cat(io.pc(38,3),"b111".U),
+  ))
+  io.br_res.ib_btb_index_pc := index_pc
+  io.br_res.ib_ubtb_hit := ubtb_miss
+
   //to IBStage
   io.out.valid := ip_data_valid
   io.out.bits.pc := io.pc
@@ -156,8 +201,8 @@ class IPStage extends Module with Config {
   io.out.bits.ubtb_resp := io.ubtb_resp.bits
   io.out.bits.ubtb_miss := ubtb_miss
   io.out.bits.ubtb_mispred := ubtb_mispred
-  io.out.bits.pcall := p_call
-  io.out.bits.pret := p_return
+  io.out.bits.pcall := pcall_vld.orR
+  io.out.bits.pret := preturn_vld.orR
   io.out.bits.push_pc := push_pc
 
 }

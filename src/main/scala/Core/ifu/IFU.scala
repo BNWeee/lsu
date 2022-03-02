@@ -56,6 +56,7 @@ class IFU extends Module with Config {
   ibstage.io.pc    := ib_pc
   ibstage.io.ip2ib := ipstage.io.out
   ibstage.io.ind_btb_target := ind_btb.io.ind_btb_target
+  ibstage.io.ip_ib_addr := RegNext(ipstage.io.br_res)
 
   val ras = Module(new RAS)
   ras.io.ibdp_ras_push_pc := ibstage.io.ras_push_pc
@@ -63,7 +64,9 @@ class IFU extends Module with Config {
   ras.io.ibctrl_ras_preturn_vld := ipstage.io.out.bits.pret
   ras.io.ibctrl_ras_pcall_vld   := ipstage.io.out.bits.pcall
 
-
-
+  val addrgen = Module(new ADDRGen)
+  addrgen.io.in := ibstage.io.ib2addrgen
+  ubtb.io.update_data := addrgen.io.ubtb_update
+  btb.io.btb_update := addrgen.io.btb_update
 
 }
