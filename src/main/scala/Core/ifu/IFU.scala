@@ -42,44 +42,63 @@ class IFU extends Module with Config {
   ipstage.io.bht_resp    := bht.io.bht_resp //TODO:封装bht输出
   ipstage.io.icache_resp := io.cache_resp
 
+  bht.io.ip_bht_con_br_vld   := ipstage.io.ip_bht_con_br_vld
+  bht.io.ip_bht_con_br_taken := ipstage.io.ip_bht_con_br_taken
+
   //IB stage
   val ip_out = RegNext(ipstage.io.out) //ubtb,btb,bht
+  val ib_pc        = ip_out.bits.pc
 
+  val ibstage = Module(new IBStage)
+  val ras = Module(new RAS)
   val ind_btb = Module(new indBTB)
+
+  ibstage.io.ip2ib := ipstage.io.out
+
+  //ras
+  ras.io.ibdp_ras_push_pc := ip_out.bits.push_pc
+  ras.io.ibctrl_ras_preturn_vld := ip_out.bits.pret //ip changeflow && pc mask && call return
+  ras.io.ibctrl_ras_pcall_vld   := ip_out.bits.pcall
+  ibstage.io.ras_target_pc := ras.io.ras_target_pc
+  //ind_btb
   ind_btb.io.bht_ghr := bht.io.bht_ghr
   ind_btb.io.rtu_ghr := bht.io.rtu_ghr
   ind_btb.io.ind_btb_path := ip_out.bits.pc(7,0)
   ind_btb.io.ib_jmp_valid := ibstage.io.ind_jmp_valid
-
-  val ibstage = Module(new IBStage)
-  val ib_pc        = ip_out.bits.pc
-  ibstage.io.pc    := ib_pc
-  ibstage.io.ip2ib := ipstage.io.out
   ibstage.io.ind_btb_target := ind_btb.io.ind_btb_target
-  ibstage.io.ip_ib_addr := RegNext(ipstage.io.br_res)
 
-  val ras = Module(new RAS)
-  ras.io.ibdp_ras_push_pc := ibstage.io.ras_push_pc
-  //ip changeflow && pc mask && call return
-  ras.io.ibctrl_ras_preturn_vld := ipstage.io.out.bits.pret
-  ras.io.ibctrl_ras_pcall_vld   := ipstage.io.out.bits.pcall
-  ibstage.io.ras_target_pc := ras.io.ras_target_pc
+  //ubtb btb update
+  ubtb.io.update_data   := ibstage.io.ubtb_update_data
+  ubtb.io.update_idx    := ibstage.io.ubtb_update_idx
+  btb.io.btb_update     := ibstage.io.btb_update
+  btb.io.ib_btb_mispred := ibstage.io.ib_redirect.valid
 
-  //addrgen
-  val addrgen = Module(new ADDRGen)
-  addrgen.io.in := ibstage.io.ib2addrgen
-  ubtb.io.update_data := addrgen.io.ubtb_update
-  btb.io.btb_update := addrgen.io.btb_update
+  //backend bpu update
+  bht.io.rtu_ifu_flush           := io.bpu_update.rtu_flush
+  bht.io.rtu_retire_condbr       := io.bpu_update.rtu_retire_condbr
+  bht.io.rtu_retire_condbr_taken := io.bpu_update.rtu_retire_condbr_taken
+  bht.io.bht_update              := io.bpu_update.bht_update
+
+  ind_btb.io.commit_jmp_path := io.bpu_update.ind_btb_commit_jmp_path
+  ind_btb.io.rtu_jmp_mispred := io.bpu_update.ind_btb_rtu_jmp_mispred
+  ind_btb.io.rtu_jmp_pc      := io.bpu_update.ind_btb_rtu_jmp_pc
+  ind_btb.io.rtu_flush       := io.bpu_update.rtu_flush
+
+//  //addrgen
+//  val addrgen = Module(new AddrGen)
+//  addrgen.io.in := ibstage.io.ib2addrgen
+//  ubtb.io.update_data := addrgen.io.ubtb_update
+//  btb.io.btb_update := addrgen.io.btb_update
 
   //inst ibuf
   val ibuf = Module(new IBuffer)
   for(i <- 0 to 7){
-    ibuf.io.in(i+1).bits.pc := Cat(ibstage.io.pc(38,4), 0.U(4.W)) + (i.U << 1.U)
+    ibuf.io.in(i+1).bits.pc := Cat(ibstage.io.ip2ib.bits.pc(38,4), 0.U(4.W)) + (i.U << 1.U)
     ibuf.io.in(i+1).bits.data := ip_out.bits.icache_resp.inst_data(i)
     ibuf.io.in(i+1).bits.is_inst32 := ip_out.bits.inst_32_9(i+1)
     ibuf.io.in(i+1).valid := ip_out.bits.chgflw_vld_mask(i+1)
   }
-  ibuf.io.in(0).bits.pc := Cat(ibstage.io.pc(38,4), 0.U(4.W)) - 2.U
+  ibuf.io.in(0).bits.pc := Cat(ibstage.io.ip2ib.bits.pc(38,4), 0.U(4.W)) - 2.U
   ibuf.io.in(0).bits.data := ip_out.bits.h0_data
   ibuf.io.in(0).bits.is_inst32 := ip_out.bits.inst_32_9(0)
   ibuf.io.in(0).valid := ip_out.bits.h0_vld //ip_out.bits.chgflw_vld_mask(0)

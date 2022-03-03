@@ -2,101 +2,116 @@ package Core.ifu
 import Core.{Config, CoreBundle}
 import chisel3._
 import chisel3.util._
-class rtu_bht extends CoreBundle {
-  val rtu_ifu_retire0_condbr = Input(Bool())
-  val rtu_ifu_retire1_condbr = Input(Bool())
-  val rtu_ifu_retire2_condbr = Input(Bool())
-  val rtu_ifu_retire0_condbr_taken = Input(Bool())
-  val rtu_ifu_retire1_condbr_taken = Input(Bool())
-  val rtu_ifu_retire2_condbr_taken = Input(Bool())
-}
-class bht_resp extends CoreBundle {
 
+class BHTUpdate extends CoreBundle {
+  val cur_pc  = UInt(VAddrBits.W)
+  val cur_ghr = UInt(22.W)
+  val cur_condbr_taken = Bool()
+  val sel_res = UInt(2.W)
 }
-class BHTIO extends  CoreBundle {
-  val rtu_bht = new rtu_bht
-  val bht_resp = new bht_resp
-  val pc = Input(UInt(VAddrBits.W))
-  val ipctrl_bht_con_br_taken = Input(Bool())
-  val ipctrl_bht_con_br_vld   = Input(Bool())
-  val cur_condbr_taken = Input(UInt(1.W))
-  val cur_pre_rst      = Input(UInt(2.W))
-  val cur_sel_rst      = Input(UInt(2.W))
-  val cur_pc           = Input(UInt(VAddrBits.W))
-  val cur_ghr          = Input(UInt(ghr_size.W))
-  val bht_ipdp_pre_array_data_ntaken = Output(UInt(pre_array_data_size.W))
-  val bht_ipdp_pre_array_data_taken = Output(UInt(pre_array_data_size.W))
-  val bht_ipdp_sel_array_result = Output(UInt(2.W))
-  val bht_ipdp_vghr = Output(UInt(ghr_size.W))
-  val rtu_ifu_flush          = Input(Bool())
-  val bht_ghr       = Output(UInt(8.W))
-  val rtu_ghr                = Output(UInt(8.W))
+
+class BHTIO extends CoreBundle {
+  val pc                  = Input(UInt(VAddrBits.W))
+  val bht_resp            = new BHT_IP_Resp
+  val ip_bht_con_br_taken = Input(Bool())
+  val ip_bht_con_br_vld   = Input(Bool())
+  val bht_ghr             = Output(UInt(8.W))
+  val rtu_ghr             = Output(UInt(8.W))
+  val rtu_ifu_flush       = Input(Bool())
+
+  val rtu_retire_condbr       = Input(Vec(3,Bool()))
+  val rtu_retire_condbr_taken = Input(Vec(3,Bool()))
+
+  val bht_update = Flipped(Valid(new BHTUpdate))
+
 }
 class BHT extends Module with Config {
   val io = IO(new BHTIO)
   val sel_array = RegInit(VecInit(Seq.fill(128)(VecInit(Seq.fill(8)(0.U(2.W))))))
-  val pre_array = RegInit(VecInit(Seq.fill(1024)(VecInit(Seq.fill(2)(0.U(32.W))))))
+  val pre_array = RegInit(VecInit(Seq.fill(1024)(VecInit(Seq.fill(2)(VecInit(Seq.fill(8)(0.U(2.W))))))))
   val vghr = RegInit(0.U(22.W))
+  val vghr_pre = WireInit(0.U(22.W))
   val rtu_ghr_reg = RegInit(0.U(22.W))
-  val rtu_ghr_pre = RegInit(0.U(22.W))
+  val rtu_ghr_pre = WireInit(0.U(22.W))
 
   //read
-  val sel_array_index = io.pc(9,3)
-  val sel_array_data_index = io.pc(5,3)
-  val sel_array_data_cur = sel_array(sel_array_index)(sel_array_data_index)
+  val sel_array_index  = io.pc(10,4)
+  val sel_array_offset = io.pc(3,1)
+  val pre_sel = sel_array(sel_array_index)(sel_array_offset)
 
-  val pre_array_rd_index = Cat(vghr(12,9),vghr(8,3)^vghr(20,15))
-  val pre_array_data_cur = pre_array(pre_array_rd_index)
-  val pre_taken_data = pre_array_data_cur(0)
-  val pre_ntaken_data = pre_array_data_cur(1)
+  //{vghr[12:9], {vghr_reg[8:3]^vghr_reg[20:15]}} is the basic index of read
+  val pre_array_index  = Cat(vghr_pre(12,9),vghr_pre(8,3) ^ vghr_pre(20,15))
+  val pre_array_offset = vghr_pre(3,0) ^ io.pc(7,4)
+  val pre_array_data = pre_array(pre_array_index)
+  val pre_taken_data = pre_array_data(0)
+  val pre_ntaken_data = pre_array_data(1)
 
+  io.bht_resp.pre_taken  := RegNext(pre_taken_data)
+  io.bht_resp.pre_ntaken := RegNext(pre_ntaken_data)
+  io.bht_resp.pre_offset := RegNext(pre_array_offset)
+  io.bht_resp.pre_sel    := RegNext(pre_sel)
 
-  io.bht_ipdp_pre_array_data_taken := pre_taken_data
-  io.bht_ipdp_pre_array_data_ntaken := pre_ntaken_data
-  io.bht_ipdp_sel_array_result := sel_array_data_cur
-  io.bht_ipdp_vghr := vghr
-
-  //ghr update
-  val rtu_con_br_vld = io.rtu_bht.rtu_ifu_retire0_condbr || io.rtu_bht.rtu_ifu_retire1_condbr || io.rtu_bht.rtu_ifu_retire2_condbr
-  when(rtu_con_br_vld) {
-    rtu_ghr_reg := rtu_ghr_pre
-  }.otherwise {
-    rtu_ghr_reg := rtu_ghr_reg
-  }
-  val rtu_condbr_cnt = Cat(io.rtu_bht.rtu_ifu_retire0_condbr,io.rtu_bht.rtu_ifu_retire1_condbr,io.rtu_bht.rtu_ifu_retire2_condbr)
-  when(rtu_condbr_cnt === 0.U) {
-    rtu_ghr_pre := rtu_ghr_reg
-  }.elsewhen(rtu_condbr_cnt === "b001".U || rtu_condbr_cnt === "b010".U || rtu_condbr_cnt === "b001".U) {
-    rtu_ghr_pre := Cat(rtu_ghr_reg(20,0) , 1.U)
-  }.elsewhen(rtu_condbr_cnt === "b111".U) {
-    rtu_ghr_pre := Cat(rtu_ghr_reg(18,0), "b111".U)
-  }.otherwise {
-    rtu_ghr_pre := Cat(rtu_ghr_reg(19,0), "b11".U)
-  }
-
+  //vghr
+  //suppose only one con_br
   when(io.rtu_ifu_flush) {
-    vghr := rtu_ghr_reg
-  }.elsewhen(io.ipctrl_bht_con_br_vld) {
-    vghr := Cat(vghr(20,0),io.ipctrl_bht_con_br_taken)
+    vghr     := rtu_ghr_pre
+    vghr_pre := rtu_ghr_pre
+  }.elsewhen(io.ip_bht_con_br_vld) {
+    vghr     := Cat(vghr(20,0),io.ip_bht_con_br_taken)
+    vghr_pre := Cat(vghr(20,0),io.ip_bht_con_br_taken)
   }.otherwise {
-    vghr := vghr
+    vghr_pre := vghr
   }
 
-  val pre_update_wen = (io.cur_condbr_taken & (io.cur_pre_rst =/= "b11".U)) | (!io.cur_condbr_taken & (io.cur_pre_rst =/= "b00".U))
-  val sel_update_wen = (io.cur_condbr_taken & (io.cur_sel_rst =/= "b11".U)) | (!io.cur_condbr_taken & (io.cur_sel_rst =/= "b00".U))
-  val pre_update_data = Mux(pre_update_wen===1.U,io.cur_pre_rst+1.U,io.cur_pre_rst-1.U)
-  val sel_update_data = Mux(sel_update_wen===1.U,io.cur_sel_rst+1.U,io.cur_sel_rst-1.U)
+  //to ib ind_btb
+  io.bht_ghr := RegNext(vghr)
 
-  when(pre_update_wen === 1.U) {
-    pre_array(Cat(vghr(12,9),vghr(8,3)^vghr(20,15)))(io.cur_pc(6,3)^io.cur_ghr(3,0)) := pre_update_data
-  }.otherwise {
-    pre_array := pre_array
+  //rtu_ghr update
+  val rtu_condbr       = io.rtu_retire_condbr.asUInt()
+  val rtu_condbr_taken = io.rtu_retire_condbr_taken.asUInt()
+  rtu_ghr_pre := MuxLookup(rtu_condbr, rtu_ghr_reg, Seq(
+    "b000" -> rtu_ghr_reg,
+    "b001" -> Cat(rtu_ghr_reg(20,0), rtu_condbr_taken(0)),
+    "b010" -> Cat(rtu_ghr_reg(20,0), rtu_condbr_taken(1)),
+    "b100" -> Cat(rtu_ghr_reg(20,0), rtu_condbr_taken(2)),
+    "b011" -> Cat(rtu_ghr_reg(19,0), rtu_condbr_taken(0), rtu_condbr_taken(1)),
+    "b101" -> Cat(rtu_ghr_reg(19,0), rtu_condbr_taken(0), rtu_condbr_taken(2)),
+    "b110" -> Cat(rtu_ghr_reg(19,0), rtu_condbr_taken(1), rtu_condbr_taken(2)),
+    "b111" -> Cat(rtu_ghr_reg(18,0), rtu_condbr_taken(0), rtu_condbr_taken(1), rtu_condbr_taken(2))
+  ))
+
+  when(rtu_condbr.orR()){
+    rtu_ghr_reg := rtu_ghr_pre
   }
-  when(sel_update_wen === 1.U) {
-    sel_array(sel_array_index)(sel_array_data_index) := sel_update_data
-  }.otherwise {
-    sel_array := sel_array
-  }
+
   io.rtu_ghr := rtu_ghr_reg
-  io.bht_ghr := vghr
+
+  //bht update
+  val cur_pc  = io.bht_update.bits.cur_pc
+  val cur_ghr = io.bht_update.bits.cur_ghr
+  val cur_condbr_taken = io.bht_update.bits.cur_condbr_taken
+  val cur_sel_res      = io.bht_update.bits.sel_res
+
+  val cur_sel_array_index  = cur_pc(10,4)
+  val cur_sel_array_offset = cur_pc(3,1)
+  val cur_pre_array_index  = Cat(cur_ghr(13,10),cur_ghr(9,4) ^ cur_ghr(21,16))
+  val cur_pre_array_offset = cur_ghr(4,1) ^ cur_pc(7,4)
+
+  val cur_pre_rst = pre_array(cur_pre_array_index)(cur_sel_res(1))(cur_pre_array_offset)
+  val cur_sel_rst = sel_array(cur_sel_array_index)(cur_sel_array_offset)
+
+  val pre_update_wen = (cur_condbr_taken & (cur_pre_rst =/= "b11".U)) | (!cur_condbr_taken & (cur_pre_rst =/= "b00".U))
+  val sel_update_wen = (cur_condbr_taken & (cur_sel_rst =/= "b11".U)) | (!cur_condbr_taken & (cur_sel_rst =/= "b00".U))
+  val pre_update_data = Mux(cur_condbr_taken,cur_pre_rst+1.U,cur_pre_rst-1.U)
+  val sel_update_data = Mux(cur_condbr_taken,cur_sel_rst+1.U,cur_sel_rst-1.U)
+
+  when(io.bht_update.valid){
+    when(pre_update_wen){
+      pre_array(cur_pre_array_index)(cur_sel_res(1))(cur_pre_array_offset) := pre_array_data
+    }
+    when(sel_update_wen){
+      sel_array(cur_sel_array_index)(cur_sel_array_offset) := sel_update_data
+    }
+  }
+
 }

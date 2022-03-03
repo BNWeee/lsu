@@ -131,6 +131,7 @@ class IPStage extends Module with Config {
     true.B               -> "b1111_1111_1".U
   ))
   val chgflw_vld_mask = chgflw_mask_pre & pc_mask9
+  val con_br_vld  = chgflw_vld_mask & con_br
   val pcall_vld   = chgflw_vld_mask & pcall
   val preturn_vld = chgflw_vld_mask & preturn
   val ind_vld     = chgflw_vld_mask & jalr & !preturn
@@ -170,38 +171,40 @@ class IPStage extends Module with Config {
       br_offset := ipdecode.io.decode_info.offset(i)
     }
   }
-  // offset
-  val branch_mask = Cat(br_mask.asUInt(),br_mask(0).asUInt()) & chgflw_vld_mask
-  val branch_base = PriorityMux(Seq(
-    branch_mask(0) -> push_pc_vec(0),
-    branch_mask(1) -> push_pc_vec(1),
-    branch_mask(2) -> push_pc_vec(2),
-    branch_mask(3) -> push_pc_vec(3),
-    branch_mask(4) -> push_pc_vec(4),
-    branch_mask(5) -> push_pc_vec(5),
-    branch_mask(6) -> push_pc_vec(6),
-    branch_mask(7) -> push_pc_vec(7),
-    branch_mask(8) -> push_pc_vec(8)
-  ))
-
-  io.br_res.ib_br_offset := br_offset
-  // base
-  io.br_res.ib_br_base := branch_base
-  //result
-  io.br_res.ib_br_result := Cat(io.pc(38,20),btb_target)
-  //index pc
-  val index_pc = PriorityMux(Seq(
-    br_mask(0) -> Cat(io.pc(38,3),"b000".U),
-    br_mask(1) -> Cat(io.pc(38,3),"b001".U),
-    br_mask(2) -> Cat(io.pc(38,3),"b010".U),
-    br_mask(3) -> Cat(io.pc(38,3),"b011".U),
-    br_mask(4) -> Cat(io.pc(38,3),"b100".U),
-    br_mask(5) -> Cat(io.pc(38,3),"b101".U),
-    br_mask(6) -> Cat(io.pc(38,3),"b110".U),
-    br_mask(7) -> Cat(io.pc(38,3),"b111".U),
-  ))
-  io.br_res.ib_btb_index_pc := index_pc
-  io.br_res.ib_ubtb_hit := ubtb_miss
+//  // offset
+//  val branch_mask = Cat(br_mask.asUInt(),br_mask(0).asUInt()) & chgflw_vld_mask
+//  val branch_base = PriorityMux(Seq(
+//    branch_mask(0) -> push_pc_vec(0),
+//    branch_mask(1) -> push_pc_vec(1),
+//    branch_mask(2) -> push_pc_vec(2),
+//    branch_mask(3) -> push_pc_vec(3),
+//    branch_mask(4) -> push_pc_vec(4),
+//    branch_mask(5) -> push_pc_vec(5),
+//    branch_mask(6) -> push_pc_vec(6),
+//    branch_mask(7) -> push_pc_vec(7),
+//    branch_mask(8) -> push_pc_vec(8)
+//  ))
+//
+//  io.br_res.ib_br_offset := br_offset
+//  // base
+//  io.br_res.ib_br_base := branch_base
+//  //result
+//  io.br_res.ib_br_result := Cat(io.pc(38,20),btb_target)
+//  //index pc
+//  val index_pc = PriorityMux(Seq(
+//    br_mask(0) -> Cat(io.pc(38,3),"b000".U),
+//    br_mask(1) -> Cat(io.pc(38,3),"b001".U),
+//    br_mask(2) -> Cat(io.pc(38,3),"b010".U),
+//    br_mask(3) -> Cat(io.pc(38,3),"b011".U),
+//    br_mask(4) -> Cat(io.pc(38,3),"b100".U),
+//    br_mask(5) -> Cat(io.pc(38,3),"b101".U),
+//    br_mask(6) -> Cat(io.pc(38,3),"b110".U),
+//    br_mask(7) -> Cat(io.pc(38,3),"b111".U),
+//  ))
+//  io.br_res.ib_btb_index_pc := index_pc
+//  io.br_res.ib_ubtb_hit := ubtb_miss
+  io.ip_bht_con_br_vld   := ip_data_valid && con_br_vld.orR()
+  io.ip_bht_con_br_taken := bht_pre_result(1)
 
   //to IBStage
   io.out.valid := ip_data_valid

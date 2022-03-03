@@ -50,14 +50,4 @@ class IBStage extends Module with Config {
   io.ubtb_update_idx.valid   := ib_data_valid && (ubtb_br_mispred || ubtb_ras_mistaken || ubtb_ras_mispred)
   io.ubtb_update_idx.bits    := io.ip2ib.bits.ubtb_resp.hit_index
 
-  
-  io.btbmiss := io.ip2ib.bits.btb_miss
-//  io.ubtb_update.entr_valid :=
-
-  //push pc to ras
-  io.ras_push_pc := io.ip2ib.bits.push_pc
-
-  //addrgen
-  io.ib2addrgen := io.ip_ib_addr
-
 }

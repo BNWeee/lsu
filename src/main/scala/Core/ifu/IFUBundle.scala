@@ -70,39 +70,39 @@ class IPStageIO extends  CoreBundle {
   val ubtb_resp   = Flipped(Valid(new uBTBResp))  //RegNext
   val icache_resp = Flipped(Valid(new ICacheResp))
   val bht_resp    = Input(new BHT_IP_Resp)
+  val ip_bht_con_br_taken = Output(Bool())
+  val ip_bht_con_br_vld   = Output(Bool())
   val btb_resp    = Vec(4,Flipped(Valid(UInt(20.W))))
 
-  val br_res = Flipped(new ib_addrgen)
+
   val out = Valid(new IP2IB)
 }
 
 class IBStageIO extends CoreBundle {
-  val pc          = Input(UInt(VAddrBits.W))
   val ip2ib       = Flipped(Valid(new IP2IB))
-  val ip_ib_addr  = new ib_addrgen
-  val ib2addrgen  = Flipped(new ib_addrgen)
+
   val ib_redirect = Valid(UInt(VAddrBits.W))
+
   val ind_jmp_valid  = Output(Bool())
   val ind_btb_target = Input(UInt(20.W))
-  val btbmiss        = Output(Bool())
-
-  val ras_push_pc    = Output(UInt(VAddrBits.W))
   val ras_target_pc  = Input(UInt(VAddrBits.W))  //ras stack top
 
   val btb_update       = Valid(new BTBUpdate)
   val ubtb_update_data = Valid(new uBTBUpdateData)
   val ubtb_update_idx  = Valid(UInt(16.W))
 }
-class chgflw extends CoreBundle {
-  val vld = Input(Bool())
-  val pc  = Input(VAddrBits.W)
-  val pred = Input(UInt(2.W))
-  val vlmu = Input(UInt(2.W))
-  val vsew = Input(UInt(3.W))
-  val vl   = Input(UInt(8.W))
-}
-class BPUUpdate extends CoreBundle {
 
+
+class BPUUpdate extends CoreBundle {
+  val rtu_flush = Input(Bool())
+
+  val rtu_retire_condbr       = Input(Vec(3,Bool()))
+  val rtu_retire_condbr_taken = Input(Vec(3,Bool()))
+  val bht_update = Flipped(Valid(new BHTUpdate))
+
+  val ind_btb_commit_jmp_path = Vec(3,Flipped(Valid(UInt(8.W))))//valid排序依次进入
+  val ind_btb_rtu_jmp_mispred = Input(Bool())
+  val ind_btb_rtu_jmp_pc      = Input(UInt(VAddrBits.W))//pc(21,1)
 }
 
 class IFUIO extends CoreBundle {
@@ -113,7 +113,7 @@ class IFUIO extends CoreBundle {
   val cache_req  = Valid(new ICacheReq)
   val cache_resp = Flipped(Valid(new ICacheResp))
   //inst out
-  val ifu_inst_out = ip_out.bits.inst_32_9(i+1)
+  val ifu_inst_out = Vec(3, Decoupled(new IBuf2Decode))
   //bht, btb update
   val bpu_update = new BPUUpdate
 }
