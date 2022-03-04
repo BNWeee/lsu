@@ -1,166 +1,123 @@
 package Core.ifu
 import Core.{Config, CoreBundle}
+import Core.utils._
 import chisel3._
 import chisel3.util._
+
+class RASPtr extends CircularQueuePtr[RASPtr](16) with HasCircularQueuePtrHelper{
+  override def cloneType = (new RASPtr).asInstanceOf[this.type]
+}
+
+class RASEntry extends Bundle with Config{
+  val retAddr = UInt(VAddrBits.W)
+  val ctr = UInt(10.W) // layer of nested call functions
+}
+object RASEntry {
+  def apply(retAddr: UInt, ctr: UInt): RASEntry = {
+    val e = Wire(new RASEntry)
+    e.retAddr := retAddr
+    e.ctr := ctr
+    e
+  }
+}
+class RASUpdateIO extends CoreBundle {
+  val iscall = Input(Bool())
+  val isret  = Input(Bool())
+  val target = Input(UInt(VAddrBits.W))
+}
 class RASIO extends CoreBundle {
-
-  //val cp0_ifu_ras_en          = Input(Bool())
-
-  val rtu_ifu_flush           = Input(Bool())
-  val rtu_ifu_mispred         = Input(Bool())
-  val rtu_ifu_pcall           = Input(Bool())
-  val rtu_ifu_preturn         = Input(Bool())
-  val ibdp_ras_push_pc        = Input(UInt(VAddrBits.W))
-  val ibctrl_ras_pcall_vld    = Input(Bool())
-  val ibctrl_ras_preturn_vld  = Input(Bool())
-  val rtu_retire0_pc        = Input(UInt(VAddrBits.W))
-  val ras_en                = Input(Bool())
-  val pcall                 = Input(Bool())   //from ip call mask
-  val preturn               = Input(Bool())
-
-  val ras_data_vld            = Output(Bool())
-  val ras_target_pc           = Output(UInt(VAddrBits.W))
-  val ras_ubtb_pc           = Output(UInt(VAddrBits.W))
-  val ras_ubtb_push_pc      = Output(UInt(VAddrBits.W))
-  val ras_ubtb_push         = Output(Bool())
+  val ifu_update = new RASUpdateIO
+  val rtu_update = new RASUpdateIO
+  val target = Output(UInt(VAddrBits.W))
+  val flush  = Input(Bool())
+  val ras_flush = Input(Bool())
 }
 class RAS extends Module with Config {
   val io = IO(new RASIO)
-  val ras = Mem(ifu_ras, UInt(VAddrBits.W))
-  //ras fifo
-  val ras_push = Wire(Bool())
-  val ras_pop  = Wire(Bool())
-  val ras_return = Wire(Bool())
-  val ras_push_pc = Wire(UInt(VAddrBits.W))
-  val ras_pc_out = Wire(UInt(VAddrBits.W))
-  ras_push := io.ibctrl_ras_pcall_vld
-  ras_pop  := io.ibctrl_ras_preturn_vld
+  val stack = RegInit(VecInit(Seq.fill(16)(0.U.asTypeOf(new RASEntry))))
+  val sp_ptr = RegInit(0.U.asTypeOf(new RASPtr))
+  val top = stack(sp_ptr.value)
+  io.target := top.retAddr
 
-
-  //rtu fifo
-  val rtu_ifu_pcall = Wire(Bool())
-  val rtu_ifu_preturn = Wire(Bool())
-  rtu_ifu_pcall := io.rtu_ifu_pcall
-  rtu_ifu_preturn := io.rtu_ifu_preturn
-
-  val rtu_ptr     = RegInit(0.U(5.W))
-  val rtu_ptr_pre = Wire(0.U(5.W))
-  val ras_ptr     = RegInit(0.U(5.W))
-  val ras_ptr_pre = Wire(0.U(5.W))
-  val status_ptr  = RegInit(0.U(5.W))
-  val status_ptr_pre = Wire(0.U(5.W))
-
-
-  //rtu ptr
-  val rtu_ras_empty = (rtu_ptr === status_ptr)
-  when(rtu_ifu_preturn && rtu_ifu_pcall) {
-    rtu_ptr_pre := rtu_ptr
-  }.elsewhen(rtu_ifu_pcall) {
-    when(rtu_ptr(3,0) === (ifu_ras-1).U) {
-      rtu_ptr_pre := Cat(!rtu_ptr(4),"b0000".U)  //rtu_ras stack overflow
-    }.otherwise {
-      rtu_ptr_pre := rtu_ptr + 1.U
+  when(io.ifu_update.iscall && io.ifu_update.isret){
+    when(top.ctr===1.U){
+      stack(sp_ptr.value) := RASEntry(io.ifu_update.target, 1.U)
+    }.elsewhen(top.retAddr=/=io.ifu_update.target){
+      stack(sp_ptr.value)       := RASEntry(top.retAddr, top.ctr - 1.U)
+      stack(sp_ptr.value + 1.U) := RASEntry(io.ifu_update.target, 1.U)
+      sp_ptr.value := sp_ptr.value + 1.U
     }
-  }.elsewhen(rtu_ifu_preturn && !rtu_ras_empty) {
-    when(rtu_ptr(3,0) === 0.U) {
-      rtu_ptr_pre := Cat(!rtu_ptr(4),"b1011".U)
-    }.otherwise {
-      rtu_ptr_pre := rtu_ptr - 1.U
-    }
-  }.otherwise {
-    rtu_ptr_pre := rtu_ptr
   }
-  rtu_ptr := Mux(io.ras_en,rtu_ptr_pre,rtu_ptr)
-
-  //ras ptr
-  val rtu_need = io.rtu_ifu_mispred || io.rtu_ifu_flush
-
-  when(rtu_need) {
-    ras_ptr_pre := rtu_ptr_pre
-  }.elsewhen(ras_push && ras_return) {
-    ras_ptr_pre := rtu_ptr
-  }.elsewhen(ras_push) {
-    when(ras_ptr(3,0) === (ifu_ras-1).U) {
-      ras_ptr_pre := Cat(!ras_ptr(4), "b0000".U)
-    }.otherwise {
-      ras_ptr_pre := ras_ptr + 1.U
+  when(io.ifu_update.iscall && !io.ifu_update.isret){
+    when(top.retAddr===io.ifu_update.target){
+      stack(sp_ptr.value) := RASEntry(top.retAddr, top.ctr + 1.U)
+    }.otherwise{
+      stack(sp_ptr.value + 1.U) := RASEntry(io.ifu_update.target, 1.U)
+      sp_ptr.value := sp_ptr.value + 1.U
     }
-  }.elsewhen(ras_pop && !ras_empty) {
-    when(ras_ptr(3,0) === "b0000".U) {
-      ras_ptr_pre := Cat(!ras_ptr(4), "b1011".U)
-    }.otherwise {
-      ras_ptr_pre := ras_ptr - 1.U
-    }
-  }.otherwise {
-    ras_ptr_pre := ras_ptr
   }
-  ras_ptr := Mux(io.ras_en,ras_ptr_pre,ras_ptr)
-
-  //status ptr  used to solve ras overflow
-  status_ptr_pre := Mux(status_ptr(3,0)==="b1011".U,Cat(status_ptr(4),"b0000".U),status_ptr+1.U)
-  when(io.ras_en && rtu_need) {
-    when(rtu_ptr_pre(4) ^ ras_ptr(4)) {
-      status_ptr := 0.U
-    }.otherwise {
-      status_ptr := Cat(status_ptr(4), rtu_ptr_pre(3,0))
-    }
-  }.elsewhen(io.ras_en && ras_full && ras_push && ras_pop) {
-    status_ptr := status_ptr
-  }.elsewhen(io.ras_en && ras_full && ras_push) {
-    status_ptr := status_ptr_pre
-  }.elsewhen(io.ras_en && ras_full && ras_pop) {
-    when(status_ptr(3,0) === 0.U) {
-      status_ptr := 0.U
-    }.otherwise {
-      status_ptr := status_ptr - 1.U
-    }
-  }.otherwise {
-    status_ptr := status_ptr
-  }
-
-  val ras_empty = ras_ptr === status_ptr
-  val ras_full  = ras_ptr === Cat(!status_ptr(4),status_ptr(3,0))
-
-  val rtu_fifo_ptr  = RegInit(0.U(4.W))
-  val rtu_fifo_ptr_pre = Wire(0.U(4.W))
-  rtu_fifo_ptr_pre := Mux(io.rtu_ifu_pcall,rtu_ptr(3,0),rtu_fifo_ptr(3,0))
-  when(io.ras_en && io.rtu_ifu_pcall) {
-    rtu_fifo_ptr := rtu_fifo_ptr_pre
-  }
-
-
-  //rtu fifo
-  val rtu_push_index = Wire(0.U(6.W))
-  for(i <- 0 until 6) {
-    when(rtu_ptr(3,0) === (0+i).U || rtu_ptr(3,0) === (6+i).U) {
-      rtu_push_index := i.U
+  when(io.ifu_update.isret && !io.ifu_update.iscall){
+    when(top.ctr===1.U){
+      sp_ptr.value := sp_ptr.value - 1.U
+    }.otherwise{
+      stack(sp_ptr.value) := RASEntry(top.retAddr, top.ctr - 1.U)
     }
   }
 
-  // ras push
-  val pushindex = ras_ptr(3,0)
-  val rtu_index = Wire(0.U(4.W))
-  for(i <- 0 until 12) {
-    when(rtu_fifo_ptr_pre === (0+i).U
-    ||rtu_fifo_ptr_pre === (0+i).U(3,0) ||  rtu_fifo_ptr_pre === (1+i).U(3,0) ||  rtu_fifo_ptr_pre === (2+i).U(3,0)
-      ||rtu_fifo_ptr_pre === (3+i).U(3,0) ||  rtu_fifo_ptr_pre === (4+i).U(3,0) ||  rtu_fifo_ptr_pre === (5+i).U(3,0)) {
-      rtu_index := i.U
+  val stack_commit = RegInit(VecInit(Seq.fill(16)(0.U.asTypeOf(new RASEntry))))//新建第二个表
+  val sp_commit = RegInit(0.U.asTypeOf(new RASPtr))
+  val top_commit = stack_commit(sp_commit.value)
+
+  when(io.rtu_update.iscall && io.rtu_update.isret){
+    when(top_commit.ctr===1.U){
+      stack_commit(sp_commit.value) := RASEntry(io.rtu_update.target, 1.U)
+    }.elsewhen(top_commit.retAddr=/=io.rtu_update.target){
+      stack_commit(sp_commit.value)       := RASEntry(top_commit.retAddr, top_commit.ctr - 1.U)
+      stack_commit(sp_commit.value + 1.U) := RASEntry(io.rtu_update.target, 1.U)
+      sp_commit.value := sp_commit.value + 1.U
     }
   }
-  val rtu_copy_index = rtu_index
-  val ras_filled = rtu_need && (rtu_copy_index===ras_ptr(3,0))
-
-  val ras_index = Mux(rtu_need,rtu_copy_index,ras_ptr(3,0))
-
-  ras_push_pc := Mux(rtu_need,io.rtu_retire0_pc,io.ibdp_ras_push_pc)
-
-  ras_pc_out            := ras.read(ras_index)
-  when(ras_push || rtu_need){
-    ras.write(ras_index,ras_push_pc)
+  when(io.rtu_update.iscall && !io.rtu_update.isret){
+    when(top_commit.retAddr===io.rtu_update.target){
+      stack_commit(sp_commit.value) := RASEntry(top_commit.retAddr, top_commit.ctr + 1.U)
+    }.otherwise{
+      stack_commit(sp_commit.value + 1.U) := RASEntry(io.rtu_update.target, 1.U)//指针+1，计数层置为1
+      sp_commit.value := sp_commit.value + 1.U
+    }
   }
-  io.ras_data_vld       := !ras_empty || ras_push && ras_filled
-  io.ras_target_pc      := Mux(io.pcall,io.ibdp_ras_push_pc,ras_pc_out)
-  io.ras_ubtb_pc        := ras_pc_out
-  io.ras_ubtb_push_pc   := io.ibdp_ras_push_pc
-  io.ras_ubtb_push      := ras_push && io.ras_en
+  when(io.rtu_update.isret && !io.rtu_update.iscall){
+    when(top_commit.ctr===1.U){
+      sp_commit.value := sp_commit.value - 1.U//已调用完毕，指针回退
+    }.otherwise{
+      stack_commit(sp_commit.value) := RASEntry(top_commit.retAddr, top_commit.ctr - 1.U)//不是第一层，地址写入commit表，计数层减1
+    }
+  }
+
+  when(io.flush){
+    for(i <- 0 until 16){
+      stack(i) := stack_commit(i)//冲刷时，stack根据commit更新
+    }
+    sp_ptr.value := sp_commit.value
+
+    when(io.rtu_update.iscall){
+      when(top_commit.retAddr===io.rtu_update.target){
+        stack(sp_commit.value).ctr := stack_commit(sp_commit.value).ctr + 1.U
+      }.otherwise{
+        sp_ptr.value := sp_commit.value + 1.U
+        stack(sp_commit.value + 1.U).retAddr := io.rtu_update.target
+        stack(sp_commit.value + 1.U).ctr := 1.U
+      }
+    }
+  }
+
+  when(io.ras_flush){
+    sp_ptr.value := 0.U
+    sp_commit.value := 0.U
+    for(i <- 0 until 16){
+      stack_commit(i).retAddr := 0.U
+      stack_commit(i).ctr := 0.U
+      stack(i).retAddr := 0.U
+      stack(i).ctr := 0.U
+    }
+  }
 }

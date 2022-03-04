@@ -7,7 +7,7 @@ import chisel3.util._
 class IPStage extends Module with Config {
   val io = IO(new IPStageIO)
 
-  val ip_data_valid = !io.ip_flush && io.icache_resp.valid
+  val ip_data_valid = !io.ip_flush && io.icache_resp.valid && io.if_vld
 
   val pc_mask = UIntToMask.rightmask(io.pc(3,1), 9)(8,1)
 
@@ -46,7 +46,7 @@ class IPStage extends Module with Config {
   val bry = Mux(bry1_hit, bry1, bry0)
 
   //h0_valid update
-  when(!io.ip_redirect.valid && !io.ubtb_resp.valid && bry(7) && inst_32(7)){
+  when(!io.ip_redirect.valid && !io.ubtb_resp.valid && bry(7) && inst_32(7) && ip_data_valid){
     h0_valid := true.B
   }.otherwise{
     h0_valid := false.B

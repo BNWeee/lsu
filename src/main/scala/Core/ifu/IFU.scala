@@ -6,6 +6,10 @@ import chisel3.util._
 class IFU extends Module with Config {
   val io = IO(new IFUIO)
 
+  val ifu_continue     = !io.tlb.tlb_miss && io.cache_req.ready && io.cache_resp.valid && ibuf.io.allowEnq
+  val backend_redirect = io.bru_redirect.valid
+  val reg_update       = ifu_continue || backend_redirect
+
   //pc select
   val pc_gen = Module(new PCGen)
   pc_gen.io.redirect(0).valid := ubtb.io.ubtb_resp.valid
@@ -15,14 +19,22 @@ class IFU extends Module with Config {
   pc_gen.io.redirect(3) := io.bru_redirect
 
   //IF stage
-  val if_data_valid = pc_gen.io.redirect(1).valid || pc_gen.io.redirect(2).valid || pc_gen.io.redirect(3).valid
-  val if_pc = pc_gen.io.pc
+  val if_pc = RegEnable(pc_gen.io.pc, reg_update)
+
+  val if_data_valid = !pc_gen.io.redirect(1).valid || !pc_gen.io.redirect(2).valid || !pc_gen.io.redirect(3).valid
+
   val ubtb = Module(new uBTB)
   val btb  = Module(new BTB)
   val bht  = Module(new BHT)
   ubtb.io.pc := if_pc
   btb.io.pc  := if_pc
   bht.io.pc  := if_pc
+  //ubtb ras forward
+  ubtb.io.ras_pc := PriorityMux(Seq(
+    (ipstage.io.out.valid && ipstage.io.out.bits.pret) -> ipstage.io.out.bits.push_pc,
+    ras.io.ifu_update.iscall -> ras.io.ifu_update.target,
+    true.B                   -> ras.io.target
+  ))
 
   io.tlb.vaddr.valid := if_data_valid
   io.tlb.vaddr.bits  := pc_gen.io.pc
@@ -31,10 +43,12 @@ class IFU extends Module with Config {
   io.cache_req.bits.paddr := io.tlb.paddr.bits
 
   //IP stage
-  val ip_pc   = RegNext(pc_gen.io.pc)
-  val ip_ubtb = RegNext(ubtb.io.ubtb_resp)
+  val if_vld  = RegEnable(if_data_valid, reg_update)
+  val ip_pc   = RegEnable(pc_gen.io.pc, reg_update)
+  val ip_ubtb = RegEnable(ubtb.io.ubtb_resp, reg_update)
 
   val ipstage = Module(new IPStage)
+  ipstage.io.if_vld      := if_vld
   ipstage.io.pc          := ip_pc
   ipstage.io.ip_flush    := pc_gen.io.redirect(2).valid || pc_gen.io.redirect(3).valid
   ipstage.io.ubtb_resp   := ip_ubtb
@@ -46,27 +60,31 @@ class IFU extends Module with Config {
   bht.io.ip_bht_con_br_taken := ipstage.io.ip_bht_con_br_taken
 
   //IB stage
-  val ip_out = RegNext(ipstage.io.out) //ubtb,btb,bht
-  val ib_pc        = ip_out.bits.pc
+  val ip_vld = RegEnable(ipstage.io.out.valid, reg_update)
+  val ip_out = RegEnable(ipstage.io.out.bits, reg_update) //ubtb,btb,bht
+  val ib_pc  = ip_out.pc
+  val ib_vld = ip_vld && !pc_gen.io.redirect(3).valid
 
   val ibstage = Module(new IBStage)
   val ras = Module(new RAS)
   val ind_btb = Module(new indBTB)
 
-  ibstage.io.ip2ib := ipstage.io.out
+  ibstage.io.ip2ib.valid := ib_vld
+  ibstage.io.ip2ib.bits  := ipstage.io.out
 
   //ras
-  ras.io.ibdp_ras_push_pc := ip_out.bits.push_pc
-  ras.io.ibctrl_ras_preturn_vld := ip_out.bits.pret //ip changeflow && pc mask && call return
-  ras.io.ibctrl_ras_pcall_vld   := ip_out.bits.pcall
-  ibstage.io.ras_target_pc := ras.io.ras_target_pc
+  ras.io.ifu_update.target := ip_out.push_pc
+  ras.io.ifu_update.isret  := ip_out.pret && ib_vld//ip changeflow && pc mask && call return
+  ras.io.ifu_update.iscall := ip_out.pcall && ib_vld
+  ibstage.io.ras_target_pc := ras.io.target
   //ind_btb
   ind_btb.io.bht_ghr := bht.io.bht_ghr
   ind_btb.io.rtu_ghr := bht.io.rtu_ghr
-  ind_btb.io.ind_btb_path := ip_out.bits.pc(7,0)
-  ind_btb.io.ib_jmp_valid := ibstage.io.ind_jmp_valid
+  ind_btb.io.ind_btb_path := ip_out.pc(7,0)
+  ind_btb.io.ib_jmp_valid := ibstage.io.ind_jmp_valid && ib_vld
   ibstage.io.ind_btb_target := ind_btb.io.ind_btb_target
 
+  //BPU update signal
   //ubtb btb update
   ubtb.io.update_data   := ibstage.io.ubtb_update_data
   ubtb.io.update_idx    := ibstage.io.ubtb_update_idx
@@ -78,6 +96,10 @@ class IFU extends Module with Config {
   bht.io.rtu_retire_condbr       := io.bpu_update.rtu_retire_condbr
   bht.io.rtu_retire_condbr_taken := io.bpu_update.rtu_retire_condbr_taken
   bht.io.bht_update              := io.bpu_update.bht_update
+
+  ras.io.rtu_update := io.bpu_update.rtu_ras_update
+  ras.io.flush      := io.bpu_update.rtu_flush && !io.bpu_update.rtu_ras_update.isret
+  ras.io.ras_flush  := io.bpu_update.rtu_flush && io.bpu_update.rtu_ras_update.isret
 
   ind_btb.io.commit_jmp_path := io.bpu_update.ind_btb_commit_jmp_path
   ind_btb.io.rtu_jmp_mispred := io.bpu_update.ind_btb_rtu_jmp_mispred
@@ -94,14 +116,14 @@ class IFU extends Module with Config {
   val ibuf = Module(new IBuffer)
   for(i <- 0 to 7){
     ibuf.io.in(i+1).bits.pc := Cat(ibstage.io.ip2ib.bits.pc(38,4), 0.U(4.W)) + (i.U << 1.U)
-    ibuf.io.in(i+1).bits.data := ip_out.bits.icache_resp.inst_data(i)
-    ibuf.io.in(i+1).bits.is_inst32 := ip_out.bits.inst_32_9(i+1)
-    ibuf.io.in(i+1).valid := ip_out.bits.chgflw_vld_mask(i+1)
+    ibuf.io.in(i+1).bits.data := ip_out.icache_resp.inst_data(i)
+    ibuf.io.in(i+1).bits.is_inst32 := ip_out.inst_32_9(i+1)
+    ibuf.io.in(i+1).valid := ip_out.chgflw_vld_mask(i+1) && ib_vld
   }
   ibuf.io.in(0).bits.pc := Cat(ibstage.io.ip2ib.bits.pc(38,4), 0.U(4.W)) - 2.U
-  ibuf.io.in(0).bits.data := ip_out.bits.h0_data
-  ibuf.io.in(0).bits.is_inst32 := ip_out.bits.inst_32_9(0)
-  ibuf.io.in(0).valid := ip_out.bits.h0_vld //ip_out.bits.chgflw_vld_mask(0)
+  ibuf.io.in(0).bits.data := ip_out.h0_data
+  ibuf.io.in(0).bits.is_inst32 := ip_out.inst_32_9(0)
+  ibuf.io.in(0).valid := ip_out.h0_vld && ib_vld//ip_out.bits.chgflw_vld_mask(0)
 
   ibuf.io.out <> io.ifu_inst_out
 }

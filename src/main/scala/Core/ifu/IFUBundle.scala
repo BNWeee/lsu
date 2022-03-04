@@ -63,6 +63,7 @@ class IP2IB extends CoreBundle {
 }
 
 class IPStageIO extends  CoreBundle {
+  val if_vld = Input(Bool())
   val pc = Input(UInt(VAddrBits.W))
   val ip_redirect = Valid(UInt(VAddrBits.W))
   val ip_flush = Input(Bool())
@@ -100,6 +101,8 @@ class BPUUpdate extends CoreBundle {
   val rtu_retire_condbr_taken = Input(Vec(3,Bool()))
   val bht_update = Flipped(Valid(new BHTUpdate))
 
+  val rtu_ras_update = new RASUpdateIO
+
   val ind_btb_commit_jmp_path = Vec(3,Flipped(Valid(UInt(8.W))))//valid排序依次进入
   val ind_btb_rtu_jmp_mispred = Input(Bool())
   val ind_btb_rtu_jmp_pc      = Input(UInt(VAddrBits.W))//pc(21,1)
@@ -110,7 +113,7 @@ class IFUIO extends CoreBundle {
   val bru_redirect = Flipped(Valid(UInt(VAddrBits.W)))
   //inst fetch
   val tlb        = new IFU_TLB
-  val cache_req  = Valid(new ICacheReq)
+  val cache_req  = Decoupled(new ICacheReq)
   val cache_resp = Flipped(Valid(new ICacheResp))
   //inst out
   val ifu_inst_out = Vec(3, Decoupled(new IBuf2Decode))

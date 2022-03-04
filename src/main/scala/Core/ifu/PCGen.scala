@@ -20,6 +20,5 @@ class PCGen extends Module with Config {
 
   pcReg := Cat(pc(VAddrBits-1,4), 0.U(4.W)) + 16.U
 
-  //TODO: icache miss, pipe stall
-  io.pc := RegNext(pc)
+  io.pc := pc
 }
