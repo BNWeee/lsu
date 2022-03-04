@@ -50,4 +50,6 @@ class IBStage extends Module with Config {
   io.ubtb_update_idx.valid   := ib_data_valid && (ubtb_br_mispred || ubtb_ras_mistaken || ubtb_ras_mispred)
   io.ubtb_update_idx.bits    := io.ip2ib.bits.ubtb_resp.hit_index
 
+  io.ind_jmp_valid := ib_data_valid && io.ip2ib.bits.ind_vld   //todo
+
 }

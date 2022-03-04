@@ -74,7 +74,7 @@ class IFU extends Module with Config {
 
 
   ibstage.io.ip2ib.valid := ib_vld
-  ibstage.io.ip2ib.bits  := ipstage.io.out
+  ibstage.io.ip2ib.bits  := ipstage.io.out.bits
 
   //ras
   ras.io.ifu_update.target := ip_out.push_pc
@@ -129,4 +129,6 @@ class IFU extends Module with Config {
   ibuf.io.in(0).valid := ip_out.h0_vld && ib_vld//ip_out.bits.chgflw_vld_mask(0)
 
   ibuf.io.out <> io.ifu_inst_out
+
+  ibuf.io.flush := backend_redirect
 }

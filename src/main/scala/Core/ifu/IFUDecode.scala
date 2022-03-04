@@ -47,7 +47,7 @@ class IFUDecode extends Module with Config {
   //jalr: jalr c.jr c.jalr
   val jalr = (Cat(inst(14,12),inst(6,0)) === "b000_1100111".U) || ((Cat(inst(15,13),inst(6,0)) === "b100_00000_10".U) && (inst(11,7) =/= 0.U(5.W)))
   //dst_valid: jal jalr with rd =/= 0, c.jalr
-  val dst_valid = ((inst(6,0) === "b1101111".U || Cat(inst(14,12),inst(6,0)) === "b000_1100111".U) && (inst(11,7) =/= 0.U(5.W))) || ((Cat(inst(15,12),inst(6,0)) === "1001_00000_10".U) && (inst(11,7) =/= 0.U(5.W)))
+  val dst_valid = ((inst(6,0) === "b1101111".U || Cat(inst(14,12),inst(6,0)) === "b000_1100111".U) && (inst(11,7) =/= 0.U(5.W))) || ((Cat(inst(15,12),inst(6,0)) === "b1001_00000_10".U) && (inst(11,7) =/= 0.U(5.W)))
 
 //==========================================================
 //                   Decode Indrect Branch

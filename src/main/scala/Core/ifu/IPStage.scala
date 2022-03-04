@@ -9,8 +9,17 @@ class IPStage extends Module with Config {
 
   val ip_data_valid = !io.ip_flush && io.icache_resp.valid && io.if_vld
 
-  val pc_mask = UIntToMask.rightmask(io.pc(3,1), 9)(8,1)
-
+//  val pc_mask = UIntToMask.rightmask(io.pc(3,1), 9)(8,1)
+  val pc_mask = PriorityMux(Seq(
+  (io.pc(3,1)==="b000".U) -> "b1111_1111".U,
+  (io.pc(3,1)==="b001".U) -> "b1111_1110".U,
+  (io.pc(3,1)==="b010".U) -> "b1111_1100".U,
+  (io.pc(3,1)==="b011".U) -> "b1111_1000".U,
+  (io.pc(3,1)==="b100".U) -> "b1111_0000".U,
+  (io.pc(3,1)==="b101".U) -> "b1110_0000".U,
+  (io.pc(3,1)==="b110".U) -> "b1100_0000".U,
+  (io.pc(3,1)==="b111".U) -> "b1000_0000".U
+))
 
   val inst_32 = Wire(Vec(8,Bool()))
   for(i <- 0 until 8){
