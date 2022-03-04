@@ -14,7 +14,7 @@ class IPStage extends Module with Config {
 
   val inst_32 = Wire(Vec(8,Bool()))
   for(i <- 0 until 8){
-    inst_32(i) := io.icache_resp.bits.inst_data(i) === "0b11".U
+    inst_32(i) := io.icache_resp.bits.inst_data(i)(1,0) === "b11".U
 
   }
 
@@ -76,7 +76,7 @@ class IPStage extends Module with Config {
   val br_mask = Mux(bht_pre_result(1), br_taken, br_ntake)
 
   //btb result
-  val btb_sel = WireInit(Vec(4,Bool()))
+  val btb_sel = Wire(Vec(4,Bool()))
   for(i <- 0 until 4){
     btb_sel(i) := br_mask(2*i+1) || br_mask(2*i)
   }
@@ -220,7 +220,7 @@ class IPStage extends Module with Config {
   io.out.bits.btb_valid := btb_valid
   io.out.bits.btb_target := btb_target
   io.out.bits.btb_miss := btb_miss
-  io.out.bits.btb_sel := btb_sel
+  io.out.bits.btb_sel := btb_sel.asUInt()
   io.out.bits.ubtb_valid := io.ubtb_resp.valid
   io.out.bits.ubtb_resp := io.ubtb_resp.bits
   io.out.bits.ubtb_miss := ubtb_miss

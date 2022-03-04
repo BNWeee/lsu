@@ -5,6 +5,14 @@ import chisel3.util._
 
 class IFU extends Module with Config {
   val io = IO(new IFUIO)
+  val ibuf = Module(new IBuffer)
+  val ubtb = Module(new uBTB)
+  val btb  = Module(new BTB)
+  val bht  = Module(new BHT)
+  val ipstage = Module(new IPStage)
+  val ibstage = Module(new IBStage)
+  val ras = Module(new RAS)
+  val ind_btb = Module(new indBTB)
 
   val ifu_continue     = !io.tlb.tlb_miss && io.cache_req.ready && io.cache_resp.valid && ibuf.io.allowEnq
   val backend_redirect = io.bru_redirect.valid
@@ -23,9 +31,7 @@ class IFU extends Module with Config {
 
   val if_data_valid = !pc_gen.io.redirect(1).valid || !pc_gen.io.redirect(2).valid || !pc_gen.io.redirect(3).valid
 
-  val ubtb = Module(new uBTB)
-  val btb  = Module(new BTB)
-  val bht  = Module(new BHT)
+
   ubtb.io.pc := if_pc
   btb.io.pc  := if_pc
   bht.io.pc  := if_pc
@@ -47,7 +53,7 @@ class IFU extends Module with Config {
   val ip_pc   = RegEnable(pc_gen.io.pc, reg_update)
   val ip_ubtb = RegEnable(ubtb.io.ubtb_resp, reg_update)
 
-  val ipstage = Module(new IPStage)
+
   ipstage.io.if_vld      := if_vld
   ipstage.io.pc          := ip_pc
   ipstage.io.ip_flush    := pc_gen.io.redirect(2).valid || pc_gen.io.redirect(3).valid
@@ -65,9 +71,7 @@ class IFU extends Module with Config {
   val ib_pc  = ip_out.pc
   val ib_vld = ip_vld && !pc_gen.io.redirect(3).valid
 
-  val ibstage = Module(new IBStage)
-  val ras = Module(new RAS)
-  val ind_btb = Module(new indBTB)
+
 
   ibstage.io.ip2ib.valid := ib_vld
   ibstage.io.ip2ib.bits  := ipstage.io.out
@@ -113,7 +117,6 @@ class IFU extends Module with Config {
 //  btb.io.btb_update := addrgen.io.btb_update
 
   //inst ibuf
-  val ibuf = Module(new IBuffer)
   for(i <- 0 to 7){
     ibuf.io.in(i+1).bits.pc := Cat(ibstage.io.ip2ib.bits.pc(38,4), 0.U(4.W)) + (i.U << 1.U)
     ibuf.io.in(i+1).bits.data := ip_out.icache_resp.inst_data(i)

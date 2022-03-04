@@ -42,13 +42,13 @@ class BTB extends Module with Config {
   val update_valid = RegInit(false.B)
   when(io.btb_update.valid){
     update_info := io.btb_update.bits
-    update_info := true.B
+    update_valid := true.B
   }
 
   when(io.ib_btb_mispred && update_valid){
     btb_valid(update_info.btb_index)(update_info.btb_tag(2,1)) := true.B
     btb_tag(update_info.btb_index)(update_info.btb_tag(2,1))   := update_info.btb_tag
     btb_data(update_info.btb_index)(update_info.btb_tag(2,1))  := update_info.btb_data
-    update_info := false.B
+    update_valid := false.B
   }
 }

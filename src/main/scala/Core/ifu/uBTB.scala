@@ -52,7 +52,7 @@ class uBTB extends Module with Config with HasCircularQueuePtrHelper {
 
   io.ubtb_resp.valid := hit_vec.asUInt.orR
   io.ubtb_resp.bits.target_pc := target_pc
-  io.ubtb_resp.bits.hit_index := hit_vec
+  io.ubtb_resp.bits.hit_index := hit_vec.asUInt()
   io.ubtb_resp.bits.is_ret    := entry_hit_ras
 
   //ubtb update

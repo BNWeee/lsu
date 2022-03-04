@@ -45,10 +45,21 @@ class indBTB extends Module with Config {
 
   val wr_idx = WireInit(0.U(8.W))
   val rd_idx = WireInit(0.U(8.W))
-  for(i <- 0 until 4){
-    wr_idx(2*i+1,2*i) := rtu_path_reg_pre(i)(2*i+1,2*i) ^ io.rtu_ghr(2*i+1,2*i)
-    rd_idx(2*i+1,2*i) := path_reg_pre(i)(2*i+1,2*i) ^ io.bht_ghr(2*i+1,2*i)
-  }
+//  for(i <- 0 until 4){
+//    wr_idx(2*i+1,2*i) := rtu_path_reg_pre(i)(2*i+1,2*i) ^ io.rtu_ghr(2*i+1,2*i)
+//    rd_idx(2*i+1,2*i) := path_reg_pre(i)(2*i+1,2*i) ^ io.bht_ghr(2*i+1,2*i)
+//  }
+  val wr_0 = rtu_path_reg_pre(0)(2*0+1,2*0) ^ io.rtu_ghr(2*0+1,2*0)
+  val rd_0 = path_reg_pre(0)(2*0+1,2*0) ^ io.bht_ghr(2*0+1,2*0)
+  val wr_1 = rtu_path_reg_pre(1)(2*1+1,2*1) ^ io.rtu_ghr(2*1+1,2*1)
+  val rd_1 = path_reg_pre(1)(2*1+1,2*1) ^ io.bht_ghr(2*1+1,2*1)
+  val wr_2 = rtu_path_reg_pre(2)(2*2+1,2*2) ^ io.rtu_ghr(2*2+1,2*2)
+  val rd_2 = path_reg_pre(2)(2*2+1,2*2) ^ io.bht_ghr(2*2+1,2*2)
+  val wr_3 = rtu_path_reg_pre(3)(2*3+1,2*3) ^ io.rtu_ghr(2*3+1,2*3)
+  val rd_3 = path_reg_pre(3)(2*3+1,2*3) ^ io.bht_ghr(2*3+1,2*3)
+
+  wr_idx := Cat(wr_0,wr_1,wr_2,wr_3)
+  rd_idx := Cat(rd_0,rd_1,rd_2,rd_3)
 
   when(io.rtu_jmp_mispred){
     target(wr_idx) := io.rtu_jmp_pc(21,1)

@@ -12,7 +12,7 @@ class BHTUpdate extends CoreBundle {
 
 class BHTIO extends CoreBundle {
   val pc                  = Input(UInt(VAddrBits.W))
-  val bht_resp            = new BHT_IP_Resp
+  val bht_resp            = Output(new BHT_IP_Resp)
   val ip_bht_con_br_taken = Input(Bool())
   val ip_bht_con_br_vld   = Input(Bool())
   val bht_ghr             = Output(UInt(8.W))
@@ -28,7 +28,7 @@ class BHTIO extends CoreBundle {
 class BHT extends Module with Config {
   val io = IO(new BHTIO)
   val sel_array = RegInit(VecInit(Seq.fill(128)(VecInit(Seq.fill(8)(0.U(2.W))))))
-  val pre_array = RegInit(VecInit(Seq.fill(1024)(VecInit(Seq.fill(2)(VecInit(Seq.fill(8)(0.U(2.W))))))))
+  val pre_array = RegInit(VecInit(Seq.fill(1024)(VecInit(Seq.fill(2)(VecInit(Seq.fill(16)(0.U(2.W))))))))
   val vghr = RegInit(0.U(22.W))
   val vghr_pre = WireInit(0.U(22.W))
   val rtu_ghr_reg = RegInit(0.U(22.W))
@@ -70,14 +70,14 @@ class BHT extends Module with Config {
   val rtu_condbr       = io.rtu_retire_condbr.asUInt()
   val rtu_condbr_taken = io.rtu_retire_condbr_taken.asUInt()
   rtu_ghr_pre := MuxLookup(rtu_condbr, rtu_ghr_reg, Seq(
-    "b000" -> rtu_ghr_reg,
-    "b001" -> Cat(rtu_ghr_reg(20,0), rtu_condbr_taken(0)),
-    "b010" -> Cat(rtu_ghr_reg(20,0), rtu_condbr_taken(1)),
-    "b100" -> Cat(rtu_ghr_reg(20,0), rtu_condbr_taken(2)),
-    "b011" -> Cat(rtu_ghr_reg(19,0), rtu_condbr_taken(0), rtu_condbr_taken(1)),
-    "b101" -> Cat(rtu_ghr_reg(19,0), rtu_condbr_taken(0), rtu_condbr_taken(2)),
-    "b110" -> Cat(rtu_ghr_reg(19,0), rtu_condbr_taken(1), rtu_condbr_taken(2)),
-    "b111" -> Cat(rtu_ghr_reg(18,0), rtu_condbr_taken(0), rtu_condbr_taken(1), rtu_condbr_taken(2))
+    "b000".U -> rtu_ghr_reg,
+    "b001".U -> Cat(rtu_ghr_reg(20,0), rtu_condbr_taken(0)),
+    "b010".U -> Cat(rtu_ghr_reg(20,0), rtu_condbr_taken(1)),
+    "b100".U -> Cat(rtu_ghr_reg(20,0), rtu_condbr_taken(2)),
+    "b011".U -> Cat(rtu_ghr_reg(19,0), rtu_condbr_taken(0), rtu_condbr_taken(1)),
+    "b101".U -> Cat(rtu_ghr_reg(19,0), rtu_condbr_taken(0), rtu_condbr_taken(2)),
+    "b110".U -> Cat(rtu_ghr_reg(19,0), rtu_condbr_taken(1), rtu_condbr_taken(2)),
+    "b111".U -> Cat(rtu_ghr_reg(18,0), rtu_condbr_taken(0), rtu_condbr_taken(1), rtu_condbr_taken(2))
   ))
 
   when(rtu_condbr.orR()){
@@ -107,7 +107,7 @@ class BHT extends Module with Config {
 
   when(io.bht_update.valid){
     when(pre_update_wen){
-      pre_array(cur_pre_array_index)(cur_sel_res(1))(cur_pre_array_offset) := pre_array_data
+      pre_array(cur_pre_array_index)(cur_sel_res(1))(cur_pre_array_offset) := pre_update_data
     }
     when(sel_update_wen){
       sel_array(cur_sel_array_index)(cur_sel_array_offset) := sel_update_data

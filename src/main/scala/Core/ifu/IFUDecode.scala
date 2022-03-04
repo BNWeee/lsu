@@ -32,22 +32,22 @@ class IFUDecode extends Module with Config {
 //==========================================================
 
   //ab_br: jal c.j
-  val ab_br = icache_br && (inst(2,1) === "0b11".U || Cat(inst(14),inst(1)) === "0b00".U)
+  val ab_br = icache_br && (inst(2,1) === "b11".U || Cat(inst(14),inst(1)) === "b00".U)
   //con_br: 32bit, 16bit con-br
-  val con_br = icache_br && (inst(2,1) === "0b01".U || Cat(inst(14),inst(1)) === "0b10".U)
+  val con_br = icache_br && (inst(2,1) === "b01".U || Cat(inst(14),inst(1)) === "b10".U)
   //auipc
-  val auipc = (inst(6,0) === "0b0010111".U)
+  val auipc = (inst(6,0) === "b0010111".U)
 
   //chgflw: contain all the chgflw inst except con_br, jal & jalr, c.j & c.jr & c.jalr
-  val chgflw = (Cat(inst(14,12),inst(6,0)) === "0b000_1100111".U) || ((Cat(inst(15,13),inst(6,0)) === "0b100_00000_10".U) && (inst(11,7) =/= 0.U(5.W))) || ab_br
+  val chgflw = (Cat(inst(14,12),inst(6,0)) === "b000_1100111".U) || ((Cat(inst(15,13),inst(6,0)) === "b100_00000_10".U) && (inst(11,7) =/= 0.U(5.W))) || ab_br
   //branch: contain all the branch inst include con_br
-  val branch = (Cat(inst(14,12),inst(6,0)) === "0b000_1100111".U) || ((Cat(inst(15,13),inst(6,0)) === "0b100_00000_10".U) && (inst(11,7) =/= 0.U(5.W))) || icache_br
+  val branch = (Cat(inst(14,12),inst(6,0)) === "b000_1100111".U) || ((Cat(inst(15,13),inst(6,0)) === "b100_00000_10".U) && (inst(11,7) =/= 0.U(5.W))) || icache_br
   //jal: jal c.j
-  val jal = inst(6,0) === "0b1101111".U || Cat(inst(15,13),inst(1,0)) === "0b10101".U
+  val jal = inst(6,0) === "b1101111".U || Cat(inst(15,13),inst(1,0)) === "b10101".U
   //jalr: jalr c.jr c.jalr
-  val jalr = (Cat(inst(14,12),inst(6,0)) === "0b000_1100111".U) || ((Cat(inst(15,13),inst(6,0)) === "0b100_00000_10".U) && (inst(11,7) =/= 0.U(5.W)))
+  val jalr = (Cat(inst(14,12),inst(6,0)) === "b000_1100111".U) || ((Cat(inst(15,13),inst(6,0)) === "b100_00000_10".U) && (inst(11,7) =/= 0.U(5.W)))
   //dst_valid: jal jalr with rd =/= 0, c.jalr
-  val dst_valid = ((inst(6,0) === "0b1101111".U || Cat(inst(14,12),inst(6,0)) === "0b000_1100111".U) && (inst(11,7) =/= 0.U(5.W))) || ((Cat(inst(15,12),inst(6,0)) === "0b1001_00000_10".U) && (inst(11,7) =/= 0.U(5.W)))
+  val dst_valid = ((inst(6,0) === "b1101111".U || Cat(inst(14,12),inst(6,0)) === "b000_1100111".U) && (inst(11,7) =/= 0.U(5.W))) || ((Cat(inst(15,12),inst(6,0)) === "1001_00000_10".U) && (inst(11,7) =/= 0.U(5.W)))
 
 //==========================================================
 //                   Decode Indrect Branch
@@ -71,24 +71,24 @@ class IFUDecode extends Module with Config {
   //1. jalr: rd == x1 or rd == x5
   //2. jal : rd == x1 or rd == x5
   //3. c.jalr
-  val call_jalr  = Cat(inst(14,12),inst(6,0)) === "0b000_1100111".U && (inst(11,7)===1.U || inst(11,7)===5.U)
-  val call_jal   = inst(6,0) === "0b1101111".U && (inst(11,7)===1.U || inst(11,7)===5.U)
-  val call_cjalr = Cat(inst(15,12),inst(6,0)) === "0b1001_00000_10".U && inst(11,7) =/= 0.U(5.W)
+  val call_jalr  = Cat(inst(14,12),inst(6,0)) === "b000_1100111".U && (inst(11,7)===1.U || inst(11,7)===5.U)
+  val call_jal   = inst(6,0) === "b1101111".U && (inst(11,7)===1.U || inst(11,7)===5.U)
+  val call_cjalr = Cat(inst(15,12),inst(6,0)) === "b1001_00000_10".U && inst(11,7) =/= 0.U(5.W)
   val is_call = call_jalr || call_jal || call_cjalr
 
   //Hn_preturn
   //1. jalr: when rs1 == x1 or rs1 == x5 and rs1!=rd
   //2. c.jr: when rs1 ==x1 or rs1 == x5
   //3. c.jalr: when rs1 == x5(c.jalr use x1 as default rd)
-  val ret_jalr  = Cat(inst(14,12),inst(6,0)) === "0b000_1100111".U && inst(11,7) =/= inst(19,15) && (inst(19,15)===1.U || inst(19,15)===5.U) && inst(31,20)===0.U
-  val ret_cjr   = Cat(inst(15,12),inst(6,0)) === "0b1000_00000_10".U && (inst(11,7)===1.U || inst(11,7)===5.U)
-  val ret_cjalr = Cat(inst(15,12),inst(6,0)) === "0b1001_00000_10".U && inst(11,7)===5.U
+  val ret_jalr  = Cat(inst(14,12),inst(6,0)) === "b000_1100111".U && inst(11,7) =/= inst(19,15) && (inst(19,15)===1.U || inst(19,15)===5.U) && inst(31,20)===0.U
+  val ret_cjr   = Cat(inst(15,12),inst(6,0)) === "b1000_00000_10".U && (inst(11,7)===1.U || inst(11,7)===5.U)
+  val ret_cjalr = Cat(inst(15,12),inst(6,0)) === "b1001_00000_10".U && inst(11,7)===5.U
   val is_return = ret_jalr || ret_cjr || ret_cjalr
 
   //Hn_ind_jmp (!return)
-  val ind_jalr  = Cat(inst(14,12),inst(6,0)) === "0b000_1100111".U && (((inst(19,15)=/=1.U && inst(19,15)=/=5.U) || inst(31,20)=/=0.U) || inst(11,7) === inst(19,15))
-  val ind_cjr   = Cat(inst(15,12),inst(6,0)) === "0b1000_00000_10".U && (inst(11,7)=/=1.U && inst(11,7)=/=5.U && inst(11,7)=/=0.U)
-  val ind_cjalr = Cat(inst(15,12),inst(6,0)) === "0b1001_00000_10".U && (inst(11,7)=/=5.U && inst(11,7)=/=0.U)
+  val ind_jalr  = Cat(inst(14,12),inst(6,0)) === "b000_1100111".U && (((inst(19,15)=/=1.U && inst(19,15)=/=5.U) || inst(31,20)=/=0.U) || inst(11,7) === inst(19,15))
+  val ind_cjr   = Cat(inst(15,12),inst(6,0)) === "b1000_00000_10".U && (inst(11,7)=/=1.U && inst(11,7)=/=5.U && inst(11,7)=/=0.U)
+  val ind_cjalr = Cat(inst(15,12),inst(6,0)) === "b1001_00000_10".U && (inst(11,7)=/=5.U && inst(11,7)=/=0.U)
   val is_ind_br = ind_jalr || ind_cjr || ind_cjalr
 
   //TODO: store, load, vector
@@ -96,19 +96,19 @@ class IFUDecode extends Module with Config {
 //==========================================================
 //                 Decode Immediate Offset
 //==========================================================
-  val offset_21_ab_br_vld  = inst(6,0) === "0b1101111".U//JAL
+  val offset_21_ab_br_vld  = inst(6,0) === "b1101111".U//JAL
   val offset_21_ab_br      = Cat(inst(31),inst(19,12),inst(20),inst(30,21),0.U(1.W))
 
-  val offset_12_ind_br_vld = Cat(inst(14,12),inst(6,0)) === "0b000_1100111".U//JARL
+  val offset_12_ind_br_vld = Cat(inst(14,12),inst(6,0)) === "b000_1100111".U//JARL
   val offset_12_ind_br     = SignExt(inst(31,20),21)
 
-  val offset_13_con_br_vld = inst(6,0) === "0b1100011".U//BEQ/BNE/BLT/BGE/BLTU/BGEU
+  val offset_13_con_br_vld = inst(6,0) === "b1100011".U//BEQ/BNE/BLT/BGE/BLTU/BGEU
   val offset_13_con_br     = SignExt(Cat(inst(31),inst(7),inst(30,25),inst(11,8),0.U(1.W)),21)
 
-  val offset_12_ab_br_vld  = Cat(inst(15,13),inst(1,0)) === "0b10101".U//C.J
+  val offset_12_ab_br_vld  = Cat(inst(15,13),inst(1,0)) === "b10101".U//C.J
   val offset_12_ab_br      = SignExt(Cat(inst(12),inst(8),inst(10,9),inst(6),inst(7),inst(2),inst(11),inst(5,3),0.U(1.W)),21)
 
-  val offset_9_con_br_vld  = Cat(inst(15,14),inst(1,0)) === "0b1101".U//C.BEQZ/C.BNEZ
+  val offset_9_con_br_vld  = Cat(inst(15,14),inst(1,0)) === "b1101".U//C.BEQZ/C.BNEZ
   val offset_9_con_br      = SignExt(Cat(inst(12),inst(6,5),inst(2),inst(11,10),inst(4,3),0.U(1.W)),21)
 
   //default will choose 0 as C.J/C.JARL result
