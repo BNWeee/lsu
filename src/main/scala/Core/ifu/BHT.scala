@@ -1,4 +1,5 @@
 package Core.ifu
+import Core.utils.ZeroExt
 import Core.{Config, CoreBundle}
 import chisel3._
 import chisel3.util._
@@ -27,8 +28,11 @@ class BHTIO extends CoreBundle {
 }
 class BHT extends Module with Config {
   val io = IO(new BHTIO)
-  val sel_array = RegInit(VecInit(Seq.fill(128)(VecInit(Seq.fill(8)(0.U(2.W))))))
-  val pre_array = RegInit(VecInit(Seq.fill(1024)(VecInit(Seq.fill(2)(VecInit(Seq.fill(16)(0.U(2.W))))))))
+//  val sel_array = RegInit(VecInit(Seq.fill(128)(VecInit(Seq.fill(8)(0.U(2.W))))))
+  val sel_array = SyncReadMem(128,Vec(8, UInt(2.W)))
+//  val pre_array = RegInit(VecInit(Seq.fill(1024)(VecInit(Seq.fill(2)(VecInit(Seq.fill(16)(0.U(2.W))))))))
+  val pre_array_taken = SyncReadMem(1024, Vec(16, UInt(2.W)))
+  val pre_array_ntake = SyncReadMem(1024, Vec(16, UInt(2.W)))
   val vghr = RegInit(0.U(22.W))
   val vghr_pre = WireInit(0.U(22.W))
   val rtu_ghr_reg = RegInit(0.U(22.W))
@@ -36,20 +40,20 @@ class BHT extends Module with Config {
 
   //read
   val sel_array_index  = io.pc(10,4)
-  val sel_array_offset = io.pc(3,1)
-  val pre_sel = sel_array(sel_array_index)(sel_array_offset)
+  val sel_array_offset = RegNext(io.pc(3,1))
+  val pre_sel_data =sel_array.read(sel_array_index)
 
   //{vghr[12:9], {vghr_reg[8:3]^vghr_reg[20:15]}} is the basic index of read
   val pre_array_index  = Cat(vghr_pre(12,9),vghr_pre(8,3) ^ vghr_pre(20,15))
   val pre_array_offset = vghr_pre(3,0) ^ io.pc(7,4)
-  val pre_array_data = pre_array(pre_array_index)
-  val pre_taken_data = pre_array_data(0)
-  val pre_ntaken_data = pre_array_data(1)
+//  val pre_array_data = pre_array(pre_array_index)
+  val pre_taken_data = pre_array_taken.read(pre_array_index)
+  val pre_ntaken_data = pre_array_ntake.read(pre_array_index)
 
-  io.bht_resp.pre_taken  := RegNext(pre_taken_data)
-  io.bht_resp.pre_ntaken := RegNext(pre_ntaken_data)
+  io.bht_resp.pre_taken  := pre_taken_data
+  io.bht_resp.pre_ntaken := pre_ntaken_data
   io.bht_resp.pre_offset := RegNext(pre_array_offset)
-  io.bht_resp.pre_sel    := RegNext(pre_sel)
+  io.bht_resp.pre_sel    := pre_sel_data(sel_array_offset)
 
   //vghr
   //suppose only one con_br
@@ -87,30 +91,43 @@ class BHT extends Module with Config {
   io.rtu_ghr := rtu_ghr_reg
 
   //bht update
-  val cur_pc  = io.bht_update.bits.cur_pc
-  val cur_ghr = io.bht_update.bits.cur_ghr
-  val cur_condbr_taken = io.bht_update.bits.cur_condbr_taken
-  val cur_sel_res      = io.bht_update.bits.sel_res
+  val update_valid = RegNext(io.bht_update.valid)
+
+  val in_ghr = io.bht_update.bits.cur_ghr
+  val update_in_sel_idx = io.bht_update.bits.cur_pc(10,4)
+  val update_in_pre_idx = Cat(in_ghr(13,10), in_ghr(9,4) ^ in_ghr(21,16))
+
+  val cur_pc  = RegNext(io.bht_update.bits.cur_pc)
+  val cur_ghr = RegNext(io.bht_update.bits.cur_ghr)
+  val cur_condbr_taken = RegNext(io.bht_update.bits.cur_condbr_taken)
+  val cur_sel_res      = RegNext(io.bht_update.bits.sel_res)
 
   val cur_sel_array_index  = cur_pc(10,4)
   val cur_sel_array_offset = cur_pc(3,1)
   val cur_pre_array_index  = Cat(cur_ghr(13,10),cur_ghr(9,4) ^ cur_ghr(21,16))
   val cur_pre_array_offset = cur_ghr(4,1) ^ cur_pc(7,4)
 
-  val cur_pre_rst = pre_array(cur_pre_array_index)(cur_sel_res(1))(cur_pre_array_offset)
-  val cur_sel_rst = sel_array(cur_sel_array_index)(cur_sel_array_offset)
+  val cur_pre_ntake_rst = pre_array_ntake.read(update_in_pre_idx)(cur_pre_array_offset)
+  val cur_pre_taken_rst = pre_array_taken.read(update_in_pre_idx)(cur_pre_array_offset)
+  val cur_pre_rst = Mux(cur_sel_res(1), cur_pre_taken_rst, cur_pre_ntake_rst)
+  val cur_sel_rst = (sel_array.read(update_in_sel_idx))(cur_sel_array_offset)
 
   val pre_update_wen = (cur_condbr_taken & (cur_pre_rst =/= "b11".U)) | (!cur_condbr_taken & (cur_pre_rst =/= "b00".U))
   val sel_update_wen = (cur_condbr_taken & (cur_sel_rst =/= "b11".U)) | (!cur_condbr_taken & (cur_sel_rst =/= "b00".U))
-  val pre_update_data = Mux(cur_condbr_taken,cur_pre_rst+1.U,cur_pre_rst-1.U)
-  val sel_update_data = Mux(cur_condbr_taken,cur_sel_rst+1.U,cur_sel_rst-1.U)
+  val pre_update_data = ZeroExt(Mux(cur_condbr_taken,cur_pre_rst+1.U,cur_pre_rst-1.U) << (cur_pre_array_offset<<1.U), 32).asTypeOf(Vec(16,UInt(2.W)))
+  val sel_update_data = ZeroExt(Mux(cur_condbr_taken,cur_sel_rst+1.U,cur_sel_rst-1.U) << (cur_sel_array_offset<<1.U), 16).asTypeOf(Vec(8,UInt(2.W)))
 
-  when(io.bht_update.valid){
-    when(pre_update_wen){
-      pre_array(cur_pre_array_index)(cur_sel_res(1))(cur_pre_array_offset) := pre_update_data
+  val pre_wmask = UIntToOH(cur_pre_array_offset)(15,0)
+  val sel_wmask = UIntToOH(cur_sel_array_offset)(7,0)
+
+  when(update_valid){
+    when(pre_update_wen && cur_sel_res(1)){
+      pre_array_taken.write(cur_pre_array_index, pre_update_data, pre_wmask.asBools)
+    }.elsewhen(pre_update_wen && !cur_sel_res(1)) {
+      pre_array_ntake.write(cur_pre_array_index, pre_update_data, pre_wmask.asBools)
     }
     when(sel_update_wen){
-      sel_array(cur_sel_array_index)(cur_sel_array_offset) := sel_update_data
+      sel_array.write(cur_sel_array_index, sel_update_data, sel_wmask.asBools)
     }
   }
 
