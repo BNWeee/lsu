@@ -13,8 +13,11 @@ class IFU extends Module with Config {
   val ibstage = Module(new IBStage)
   val ras = Module(new RAS)
   val ind_btb = Module(new indBTB)
+  val icache = Module(new ICache(cacheNum=0, is_sim=true))
 
-  val ifu_continue     = !io.tlb.tlb_miss && io.cache_req.ready && io.cache_resp.valid && ibuf.io.allowEnq
+
+
+  val ifu_continue     = !io.tlb.tlb_miss && icache.io.cache_req.ready && icache.io.cache_resp.valid && ibuf.io.allowEnq
   val backend_redirect = io.bru_redirect.valid
   val reg_update       = ifu_continue || backend_redirect
 
@@ -44,9 +47,17 @@ class IFU extends Module with Config {
 
   io.tlb.vaddr.valid := if_data_valid
   io.tlb.vaddr.bits  := pc_gen.io.pc
-  io.cache_req.valid := if_data_valid && io.tlb.paddr.valid && !io.tlb.tlb_miss
-  io.cache_req.bits.vaddr := if_pc
-  io.cache_req.bits.paddr := io.tlb.paddr.bits
+  //io.cache_req.valid := if_data_valid && io.tlb.paddr.valid && !io.tlb.tlb_miss
+  //io.cache_req.bits.vaddr := if_pc
+  //io.cache_req.bits.paddr := io.tlb.paddr.bits
+
+  icache.io.cache_req.valid := if_data_valid && io.tlb.paddr.valid && !io.tlb.tlb_miss
+  icache.io.cache_req.bits.vaddr := if_pc
+  icache.io.cache_req.bits.paddr := io.tlb.paddr.bits
+
+  icache.io.cohreq := DontCare
+  icache.io.cohresp.valid := false.B
+  icache.io.cohresp.bits := DontCare
 
   //IP stage
   val if_vld  = RegEnable(if_data_valid, reg_update)
@@ -60,7 +71,7 @@ class IFU extends Module with Config {
   ipstage.io.ubtb_resp   := ip_ubtb
   ipstage.io.btb_resp    := btb.io.btb_target
   ipstage.io.bht_resp    := bht.io.bht_resp //TODO:封装bht输出
-  ipstage.io.icache_resp := io.cache_resp
+  ipstage.io.icache_resp := icache.io.cache_resp
 
   bht.io.ip_bht_con_br_vld   := ipstage.io.ip_bht_con_br_vld
   bht.io.ip_bht_con_br_taken := ipstage.io.ip_bht_con_br_taken

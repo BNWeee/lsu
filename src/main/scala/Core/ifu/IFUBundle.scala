@@ -113,8 +113,8 @@ class IFUIO extends CoreBundle {
   val bru_redirect = Flipped(Valid(UInt(VAddrBits.W)))
   //inst fetch
   val tlb        = new IFU_TLB
-  val cache_req  = Decoupled(new ICacheReq)
-  val cache_resp = Flipped(Valid(new ICacheResp))
+  //val cache_req  = Decoupled(new ICacheReq)
+  //val cache_resp = Flipped(Valid(new ICacheResp))
   //inst out
   val ifu_inst_out = Vec(3, Decoupled(new IBuf2Decode))
   //bht, btb update
