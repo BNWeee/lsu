@@ -40,7 +40,7 @@ class BHT extends Module with Config {
 
   //read
   val sel_array_index  = io.pc(10,4)
-  val sel_array_offset = RegNext(io.pc(3,1))
+  val sel_array_offset = RegNext(io.pc(3,1))  //???
   val pre_sel_data =sel_array.read(sel_array_index)
 
   //{vghr[12:9], {vghr_reg[8:3]^vghr_reg[20:15]}} is the basic index of read

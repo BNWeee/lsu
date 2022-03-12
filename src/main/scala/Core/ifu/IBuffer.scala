@@ -46,8 +46,9 @@ class IBuffer extends Module with Config with HasCircularQueuePtrHelper {
       valid(enqPtr.value + i.U) := io.in(i).valid
       data(enqPtr.value + i.U) := io.in(i).bits
     }
-  }.elsewhen(!io.in(0).valid && io.allowEnq) {
+  }.elsewhen(io.in(1).valid && !io.in(0).valid && io.allowEnq) {
     for (i <- 0 until 8) {
+      printf("%d \n",i.U)
       valid(enqPtr.value + i.U) := io.in(i + 1).valid
       data(enqPtr.value + i.U) := io.in(i + 1).bits
     }

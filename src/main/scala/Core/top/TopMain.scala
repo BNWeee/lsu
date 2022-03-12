@@ -9,7 +9,7 @@ object TopMain extends App {
   (new ChiselStage).execute(
     args,
     Seq(
-      ChiselGeneratorAnnotation(() => new IFU()),
+      ChiselGeneratorAnnotation(() => new SimTop()),
     )
   )
 }

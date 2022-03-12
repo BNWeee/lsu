@@ -33,6 +33,7 @@ class BTB extends Module with Config {
     if_tag(i) := Cat(io.pc(20,14), 0.U(3.W)) + (i.U << 1.U)
   }
 
+
   for(i <- 0 until 4){
     val tag   = RegNext(if_tag(i))
     io.btb_target(i).bits  := btb_data.read(if_index)(tag(2,1))
